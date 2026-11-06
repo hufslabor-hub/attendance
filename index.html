@@ -43,7 +43,11 @@ th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;z-inde
 @media(max-width:600px){th,td{padding:9px 4px;font-size:14px}td button{padding:7px 9px;font-size:13px}}
 #proj{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;justify-content:center;padding:4vw 5vw;background:#0e1a33;color:#fff}
 #proj.on{display:flex}
+#proj .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:3vw}
 #proj .pt{font-size:3.2vw;opacity:.85;font-weight:600}
+#pk{text-align:right;line-height:1.2;flex:none}
+#pk b{display:block;font-size:4.4vw;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+#pk small{font-size:2.1vw;opacity:.75}
 #proj .pn{display:flex;align-items:baseline;gap:2vw;margin:.5vw 0}
 #pa{font-size:21vw;line-height:1.05;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;display:inline-block}
 #proj .pn span{font-size:4vw;font-weight:600}#proj .pn small{font-size:3vw;opacity:.7;margin-left:auto}
@@ -55,7 +59,7 @@ th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;z-inde
 #ps{align-self:flex-start;font-size:4.6vw;font-weight:800;padding:.8vw 2.4vw;border-radius:99px;background:#ffffff1f}
 #proj.ok #ps{background:#3ed598;color:#062a1c}
 #pr{font-size:2.4vw;margin-top:2vw;opacity:.9}
-#pc{position:absolute;top:1.5vw;right:2vw;background:transparent;color:#fff;border-color:#ffffff55;opacity:.6}
+#pc{position:absolute;top:.7vw;right:2vw;background:transparent;color:#fff;border-color:#ffffff55;opacity:.6}
 .bump{animation:bump .45s}.pop{animation:pop .7s}
 @keyframes bump{from{transform:scale(1.07)}to{transform:scale(1)}}
 @keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
@@ -65,7 +69,7 @@ th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;z-inde
 </head>
 <body>
 <div class="wrap" id="app"><p class="mute">불러오는 중…</p></div>
-<div id="proj"><button id="pc">닫기 (Esc)</button><div class="pt" id="pt"></div>
+<div id="proj"><button id="pc">닫기 (Esc)</button><div class="ph"><div class="pt" id="pt"></div><div id="pk"><b id="pkt"></b><small id="pkd"></small></div></div>
   <div class="pn"><b id="pa">0</b><span>명 출석</span><small id="pe"></small></div>
   <div class="pbar"><i id="pf" style="width:0"></i><u id="pm" style="left:50%;text-decoration:none"><b id="pml"></b></u></div>
   <div id="ps"></div><div id="pr"></div></div>
@@ -193,7 +197,14 @@ function pick(id){
 
 /* ───────── 프로젝터 화면: 총회 성립 요건 = 재적인원 과반수 출석 / 의결 = 출석 인원 과반수 찬성 ───────── */
 let lastA=-1,wasOk=false;
-function openProj(){$("#proj").classList.add("on");lastA=-1;wasOk=false;drawProj();document.documentElement.requestFullscreen?.().catch(()=>{})}
+let clk;
+const kstD=new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"long",day:"numeric",weekday:"long"});
+const kstT=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Seoul",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+function tick(){
+  if(!$("#proj").classList.contains("on")){clearInterval(clk);return}
+  const d=new Date();$("#pkt").textContent=kstT.format(d);$("#pkd").textContent=kstD.format(d)+" KST";
+}
+function openProj(){$("#proj").classList.add("on");lastA=-1;wasOk=false;drawProj();tick();clearInterval(clk);clk=setInterval(tick,1000);document.documentElement.requestFullscreen?.().catch(()=>{})}
 function closeProj(){$("#proj").classList.remove("on");if(document.fullscreenElement)document.exitFullscreen()}
 $("#pc").onclick=closeProj;
 document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement)$("#proj").classList.remove("on")});
