@@ -209,7 +209,7 @@ function drawProj(){
   if(ok&&!wasOk){ps.classList.remove("pop");void ps.offsetWidth;ps.classList.add("pop")}
   wasOk=ok;
   $("#pr").innerHTML=ok?`의결 정족수: 출석 ${a}명의 과반수, <b>${Math.floor(a/2)+1}명 이상</b> 찬성`
-    :`총회는 재적인원 과반수 출석으로 성립하고, 출석 인원 과반수의 찬성으로 의결합니다.`;
+    :`이번 총회는 재적인원 과반수 출석으로 성립하고, 출석 인원 과반수의 찬성으로 의결합니다.`;
 }
 
 const fmt=t=>t?.toDate?t.toDate().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
