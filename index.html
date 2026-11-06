@@ -38,11 +38,34 @@ th{font-size:13px;color:var(--mute);font-weight:600}
 #qrbox{background:#fff;color:#111;border-radius:12px;padding:28px;text-align:center;max-width:420px;width:100%}
 #qrbox h2{font-size:24px;margin:0 0 4px}#qr{display:flex;justify-content:center;margin:16px 0}
 .scroll{overflow-x:auto}
+#proj{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;justify-content:center;padding:4vw 5vw;background:#0e1a33;color:#fff}
+#proj.on{display:flex}
+#proj .pt{font-size:3.2vw;opacity:.85;font-weight:600}
+#proj .pn{display:flex;align-items:baseline;gap:2vw;margin:.5vw 0}
+#pa{font-size:21vw;line-height:1.05;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;display:inline-block}
+#proj .pn span{font-size:4vw;font-weight:600}#proj .pn small{font-size:3vw;opacity:.7;margin-left:auto}
+#proj .pbar{position:relative;height:3.2vw;background:#ffffff26;border-radius:2vw;margin:1.5vw 0 6vw}
+#pf{display:block;height:100%;border-radius:2vw;background:#7ea4ff;transition:width .6s}
+#proj.ok #pf{background:#3ed598}
+#pm{position:absolute;top:-1vw;bottom:-1vw;width:.4vw;background:#fff;transform:translateX(-50%)}
+#pm b{position:absolute;top:100%;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:2vw;margin-top:.4vw;font-weight:600}
+#ps{align-self:flex-start;font-size:4.6vw;font-weight:800;padding:.8vw 2.4vw;border-radius:99px;background:#ffffff1f}
+#proj.ok #ps{background:#3ed598;color:#062a1c}
+#pr{font-size:2.4vw;margin-top:2vw;opacity:.9}
+#pc{position:absolute;top:1.5vw;right:2vw;background:transparent;color:#fff;border-color:#ffffff55;opacity:.6}
+.bump{animation:bump .45s}.pop{animation:pop .7s}
+@keyframes bump{from{transform:scale(1.07)}to{transform:scale(1)}}
+@keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.bump,.pop{animation:none}#pf{transition:none}}
 @media print{body>*:not(#modal){display:none!important}#modal{position:static;background:none;display:block}#qrbox{margin:0 auto}.noprint{display:none}}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"><p class="mute">불러오는 중…</p></div>
+<div id="proj"><button id="pc">닫기 (Esc)</button><div class="pt" id="pt"></div>
+  <div class="pn"><b id="pa">0</b><span>명 출석</span><small id="pe"></small></div>
+  <div class="pbar"><i id="pf" style="width:0"></i><u id="pm" style="left:50%;text-decoration:none"><b id="pml"></b></u></div>
+  <div id="ps"></div><div id="pr"></div></div>
 <div id="modal"><div id="qrbox"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -56,13 +79,13 @@ import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged}
 
 /* ▼▼ Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 설정값으로 교체 ▼▼ */
 const firebaseConfig={
-apiKey: "AIzaSyBCdPAcgpf-nFpriAh6xPcH9B6J2oacHzg",
-  authDomain: "hufs-union-attendance.firebaseapp.com",
-  projectId: "hufs-union-attendance",
-  appId: "1:539700502440:web:7859b57b608737d0e5479d"
+  apiKey:"YOUR_API_KEY",
+  authDomain:"YOUR_PROJECT.firebaseapp.com",
+  projectId:"YOUR_PROJECT",
+  appId:"YOUR_APP_ID"
 };
 // 조합원 DB(Apps Script 웹앱) 주소: /exec 까지만 입력
-const MEMBER_API="https://script.google.com/macros/s/AKfycbznLTBJQIn91BLU-wyCGpehykUlWM9Q7rsts5pHr9nA17qFMrMtWB3nxlY2P54jNyc/exec";
+const MEMBER_API="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
 // 참석 명단에서 제외할 그룹(상태) 표기 — 필요하면 수정
 const EXCLUDE_STATUS=["퇴직","자격정지"];
 /* ▲▲ */
@@ -144,7 +167,7 @@ function pick(id){
   if(!cur){$("#main").innerHTML=`<div class="card"><p>'새 총회 만들기'로 첫 총회를 만들어 주세요.</p></div>`;return}
   $("#main").innerHTML=`<div class="card">
     <div class="row" style="margin-bottom:6px"><button class="p" id="db">조합원 DB에서 불러오기</button><button id="up">엑셀로 올리기</button>
-      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button>
+      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button><button id="pj">프로젝터 화면</button>
       <input id="f" type="file" accept=".xlsx,.xls,.csv" hidden></div>
     <p class="mute" style="margin:6px 0 0">조합원 DB 또는 엑셀(첫 행에 '이름', '전화번호', 선택 '소속')에서 불러옵니다. 다시 불러오면 새 인원만 추가됩니다.</p>
     <div class="stat"><b id="n1">0</b><span class="mute" id="n2"></span></div>
@@ -154,7 +177,7 @@ function pick(id){
     <div class="scroll"><table><thead><tr><th>이름</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   $("#up").onclick=()=>$("#f").click();$("#db").onclick=syncDb;
   $("#f").onchange=e=>upload(e.target.files[0]);
-  $("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
+  $("#pj").onclick=openProj;$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
   $("#s").oninput=e=>{q=e.target.value.trim();draw()};
   $("#tabs").onclick=e=>{const f=e.target.dataset.f;if(!f)return;filter=f;
     document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.f===f));draw()};
@@ -162,6 +185,30 @@ function pick(id){
     members=snap.docs.map(d=>({id:d.id,...d.data()}));
     members.sort((a,b)=>a.name.localeCompare(b.name,"ko"));draw();
   });
+}
+
+/* ───────── 프로젝터 화면: 총회 성립 요건 = 재적인원 과반수 출석 / 의결 = 출석 인원 과반수 찬성 ───────── */
+let lastA=-1,wasOk=false;
+function openProj(){$("#proj").classList.add("on");lastA=-1;wasOk=false;drawProj();document.documentElement.requestFullscreen?.().catch(()=>{})}
+function closeProj(){$("#proj").classList.remove("on");if(document.fullscreenElement)document.exitFullscreen()}
+$("#pc").onclick=closeProj;
+document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement)$("#proj").classList.remove("on")});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeProj()});
+function drawProj(){
+  const p=$("#proj");if(!p.classList.contains("on"))return;
+  const tot=members.length,a=members.filter(m=>m.checkedIn).length,need=Math.floor(tot/2)+1,ok=tot>0&&a>=need;
+  $("#pt").textContent=sessions.find(x=>x.id===cur)?.title||"";
+  const pa=$("#pa");pa.textContent=a;
+  if(a!==lastA){pa.classList.remove("bump");void pa.offsetWidth;pa.classList.add("bump");lastA=a}
+  $("#pe").textContent=`재적 ${tot}명`;
+  $("#pf").style.width=Math.min(100,tot?a/tot*100:0)+"%";
+  $("#pm").style.left=(tot?need/tot*100:50)+"%";$("#pml").textContent=`성립 ${need}명`;
+  p.classList.toggle("ok",ok);
+  const ps=$("#ps");ps.textContent=ok?"총회가 성립되었습니다":`성립까지 ${Math.max(0,need-a)}명 남았습니다`;
+  if(ok&&!wasOk){ps.classList.remove("pop");void ps.offsetWidth;ps.classList.add("pop")}
+  wasOk=ok;
+  $("#pr").innerHTML=ok?`의결 정족수: 출석 ${a}명의 과반수, <b>${Math.floor(a/2)+1}명 이상</b> 찬성`
+    :`총회는 재적인원 과반수 출석으로 성립하고, 출석 인원 과반수의 찬성으로 의결합니다.`;
 }
 
 const fmt=t=>t?.toDate?t.toDate().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
@@ -174,6 +221,7 @@ function draw(){
     <td><span class="tag ${m.checkedIn?"in":""}">${m.checkedIn?"참석":"미참석"}</span></td><td class="mute">${fmt(m.checkedInAt)}</td>
     <td><button data-id="${m.id}">${m.checkedIn?"취소":"수동 확인"}</button></td></tr>`).join("")
     ||`<tr><td colspan="5" class="mute">${tot?"조건에 맞는 인원이 없습니다.":"엑셀로 명단을 올려 주세요."}</td></tr>`;
+  drawProj();
   $("#tb").onclick=async e=>{const id=e.target.dataset.id;if(!id)return;const m=members.find(x=>x.id===id);
     await updateDoc(doc(db,"sessions",cur,"members",id),m.checkedIn?{checkedIn:false,checkedInAt:null}:{checkedIn:true,checkedInAt:serverTimestamp()})};
 }
