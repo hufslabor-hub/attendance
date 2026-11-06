@@ -26,9 +26,9 @@ button.big{width:100%;padding:15px;font-size:17px;margin-top:20px}
 .stat{display:flex;align-items:baseline;gap:10px;margin:8px 0 10px}
 .stat b{font-size:44px;line-height:1;letter-spacing:-.03em}
 .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok);transition:width .4s}
-table{width:100%;border-collapse:collapse;font-size:15px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:15px}
 th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
-th{font-size:13px;color:var(--mute);font-weight:600}
+th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;z-index:2;background:var(--card);border-bottom:2px solid var(--line)}
 .tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:13px;font-weight:600;background:var(--bg);color:var(--mute)}
 .tag.in{background:var(--okbg);color:var(--ok)}
 .tabs button{padding:8px 13px}.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -39,7 +39,8 @@ th{font-size:13px;color:var(--mute);font-weight:600}
 #modal.on{display:flex}
 #qrbox{background:#fff;color:#111;border-radius:12px;padding:28px;text-align:center;max-width:420px;width:100%}
 #qrbox h2{font-size:24px;margin:0 0 4px}#qr{display:flex;justify-content:center;margin:16px 0}
-.scroll{overflow-x:auto}
+.scroll{overflow-x:clip}
+@media(max-width:600px){th,td{padding:9px 4px;font-size:14px}td button{padding:7px 9px;font-size:13px}}
 #proj{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;justify-content:center;padding:4vw 5vw;background:#0e1a33;color:#fff}
 #proj.on{display:flex}
 #proj .pt{font-size:3.2vw;opacity:.85;font-weight:600}
