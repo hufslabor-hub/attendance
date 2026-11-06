@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>총회 참석자 확인</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f3a8a'/%3E%3Crect x='16' y='12' width='32' height='42' rx='5' fill='%23fff'/%3E%3Crect x='24' y='8' width='16' height='9' rx='3' fill='%23c8312b'/%3E%3Cpath d='M23 33l6 6 12-13' fill='none' stroke='%231f3a8a' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M23 47h18' stroke='%239aa7c7' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#1f3a8a">
 <style>
 :root{--bg:#f3f4f6;--card:#fff;--ink:#16213a;--mute:#6a7385;--line:#dfe2e8;--acc:#1f3a8a;--red:#c8312b;--ok:#0f7a55;--okbg:#e3f4ec}
 @media(prefers-color-scheme:dark){:root{--bg:#101522;--card:#192034;--ink:#eef1f7;--mute:#9aa3b8;--line:#2b3550;--acc:#8fa8ff;--red:#ff7a72;--ok:#4fd1a1;--okbg:#17372d}}
@@ -209,7 +211,7 @@ function drawProj(){
   if(ok&&!wasOk){ps.classList.remove("pop");void ps.offsetWidth;ps.classList.add("pop")}
   wasOk=ok;
   $("#pr").innerHTML=ok?`의결 정족수: 출석 ${a}명의 과반수, <b>${Math.floor(a/2)+1}명 이상</b> 찬성`
-    :`이번 총회는 재적인원 과반수 출석으로 성립하고, 출석 인원 과반수의 찬성으로 의결합니다.`;
+    :`총회는 재적인원 과반수 출석으로 성립하고, 출석 인원 과반수의 찬성으로 의결합니다.`;
 }
 
 const fmt=t=>t?.toDate?t.toDate().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
