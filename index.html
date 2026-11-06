@@ -135,7 +135,8 @@ function login(){
   <label for="w">비밀번호</label><input id="w" type="password" autocomplete="current-password">
   <button class="p big" id="li">로그인</button><div id="r"></div></div>`;
   $("#li").onclick=()=>signInWithEmailAndPassword(auth,$("#e").value,$("#w").value)
-    .catch(()=>$("#r").innerHTML=`<div class="msg no">이메일 또는 비밀번호가 맞지 않습니다.</div>`);
+    .catch(e=>{const c=e.code||"";const m={"auth/invalid-credential":"이메일 또는 비밀번호가 맞지 않습니다.","auth/invalid-email":"이메일 형식이 올바르지 않습니다.","auth/operation-not-allowed":"Firebase에서 이메일/비밀번호 로그인이 켜져 있지 않습니다.","auth/api-key-not-valid.-please-pass-a-valid-api-key.":"index.html의 firebaseConfig(apiKey)가 올바르지 않습니다.","auth/invalid-api-key":"index.html의 firebaseConfig(apiKey)가 올바르지 않습니다.","auth/unauthorized-domain":"Firebase 승인된 도메인에 이 주소가 등록되어 있지 않습니다.","auth/too-many-requests":"시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.","auth/network-request-failed":"네트워크 연결을 확인해 주세요."};
+    $("#r").innerHTML=`<div class="msg no">${m[c]||"로그인하지 못했습니다."}<br><small>오류 코드: ${esc(c)}</small></div>`});
 }
 
 let unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
