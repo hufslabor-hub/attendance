@@ -139,7 +139,7 @@ function login(){
     $("#r").innerHTML=`<div class="msg no">${m[c]||"로그인하지 못했습니다."}<br><small>오류 코드: ${esc(c)}</small></div>`});
 }
 
-let unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
+let campusF="",campusKey="",unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
 function admin(){
   root.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:12px">
     <h1 style="margin:0">총회 참석자 관리</h1><button id="out">로그아웃</button></div>
@@ -173,13 +173,13 @@ function pick(id){
     <p class="mute" style="margin:6px 0 0">조합원 DB 또는 엑셀(첫 행에 '이름', '전화번호', 선택 '소속')에서 불러옵니다. 다시 불러오면 새 인원만 추가됩니다.</p>
     <div class="stat"><b id="n1">0</b><span class="mute" id="n2"></span></div>
     <div class="bar"><i id="bar" style="width:0"></i></div>
-    <div class="row" style="margin:16px 0 8px"><input id="s" class="grow" placeholder="이름·소속 검색">
+    <div class="row" style="margin:16px 0 8px"><input id="s" class="grow" placeholder="이름·소속·캠퍼스 검색"><select id="cf" style="width:auto" aria-label="캠퍼스 선택"><option value="">전체 캠퍼스</option></select>
       <span class="tabs row" id="tabs"><button data-f="all" class="on">전체</button><button data-f="in">참석</button><button data-f="out">미참석</button></span></div>
-    <div class="scroll"><table><thead><tr><th>이름</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
+    <div class="scroll"><table><thead><tr><th>이름</th><th>캠퍼스</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   $("#up").onclick=()=>$("#f").click();$("#db").onclick=syncDb;
   $("#f").onchange=e=>upload(e.target.files[0]);
   $("#pj").onclick=openProj;$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
-  $("#s").oninput=e=>{q=e.target.value.trim();draw()};
+  $("#s").oninput=e=>{q=e.target.value.trim();draw()};campusKey="";$("#cf").onchange=e=>{campusF=e.target.value;draw()};
   $("#tabs").onclick=e=>{const f=e.target.dataset.f;if(!f)return;filter=f;
     document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.f===f));draw()};
   unsubM=onSnapshot(collection(db,"sessions",cur,"members"),snap=>{
@@ -217,11 +217,15 @@ function draw(){
   const tot=members.length,inn=members.filter(m=>m.checkedIn).length;
   $("#n1").textContent=inn;$("#n2").textContent=`/ ${tot}명 참석 (${tot?Math.round(inn/tot*100):0}%)`;
   $("#bar").style.width=(tot?inn/tot*100:0)+"%";
-  const list=members.filter(m=>(filter==="all"||(filter==="in")===!!m.checkedIn)&&(!q||(m.name+(m.dept||"")).includes(q)));
-  $("#tb").innerHTML=list.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.dept)}</td>
+  const cs=[...new Set(members.map(m=>m.campus).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ko"));
+  if(cs.length&&members.some(m=>!m.campus))cs.push("미지정");
+  if(cs.join("|")!==campusKey){campusKey=cs.join("|");if(campusF&&!cs.includes(campusF))campusF="";
+    $("#cf").innerHTML=`<option value="">전체 캠퍼스</option>`+cs.map(c=>`<option>${esc(c)}</option>`).join("");$("#cf").value=campusF}
+  const list=members.filter(m=>(filter==="all"||(filter==="in")===!!m.checkedIn)&&(!campusF||(m.campus||"미지정")===campusF)&&(!q||(m.name+(m.dept||"")+(m.campus||"")).includes(q)));
+  $("#tb").innerHTML=list.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.campus)}</td><td>${esc(m.dept)}</td>
     <td><span class="tag ${m.checkedIn?"in":""}">${m.checkedIn?"참석":"미참석"}</span></td><td class="mute">${fmt(m.checkedInAt)}</td>
     <td><button data-id="${m.id}">${m.checkedIn?"취소":"수동 확인"}</button></td></tr>`).join("")
-    ||`<tr><td colspan="5" class="mute">${tot?"조건에 맞는 인원이 없습니다.":"엑셀로 명단을 올려 주세요."}</td></tr>`;
+    ||`<tr><td colspan="6" class="mute">${tot?"조건에 맞는 인원이 없습니다.":"엑셀로 명단을 올려 주세요."}</td></tr>`;
   drawProj();
   $("#tb").onclick=async e=>{const id=e.target.dataset.id;if(!id)return;const m=members.find(x=>x.id===id);
     await updateDoc(doc(db,"sessions",cur,"members",id),m.checkedIn?{checkedIn:false,checkedInAt:null}:{checkedIn:true,checkedInAt:serverTimestamp()})};
@@ -231,7 +235,7 @@ async function upload(file){
   if(!file)return;
   const wb=XLSX.read(await file.arrayBuffer()),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
   const get=(r,keys)=>{for(const k in r)if(keys.includes(k.replace(/\s/g,"")))return r[k];return""};
-  await addMembers(rows.map(r=>({name:get(r,["이름","성명"]),phone:get(r,["전화번호","휴대폰","연락처","핸드폰"]),dept:get(r,["소속","지부","부서"])})));
+  await addMembers(rows.map(r=>({name:get(r,["이름","성명"]),phone:get(r,["전화번호","휴대폰","연락처","핸드폰"]),dept:get(r,["소속","지부","부서"]),campus:get(r,["캠퍼스","근무지"])})));
 }
 
 async function syncDb(){
@@ -243,24 +247,29 @@ async function syncDb(){
     if(j.error)throw new Error(j.error);
     localStorage.setItem("mtk",t);
     const ok=j.members.filter(m=>!EXCLUDE_STATUS.some(x=>(m.status||"").includes(x)));
-    await addMembers(ok.map(m=>({name:m.name,phone:m.phone4,dept:m.dept})));
+    await addMembers(ok.map(m=>({name:m.name,phone:m.phone4,dept:m.dept,campus:m.campus})));
   }catch(e){localStorage.removeItem("mtk");alert("조합원 DB를 불러오지 못했습니다. ("+(e.message||"연결 실패")+")\n웹앱 주소·배포 권한·키를 확인해 주세요.")}
 }
 
 async function addMembers(list){
-  const have=new Set(members.map(m=>m.id)),add=[];let skip=0;
+  const byId=new Map(members.map(m=>[m.id,m])),seen=new Set(byId.keys()),add=[],upd=[];let skip=0;
   for(const r of list){
-    const name=String(r.name||"").trim(),last4=String(r.phone||"").replace(/\D/g,"").slice(-4);
+    const name=String(r.name||"").trim(),last4=String(r.phone||"").replace(/\D/g,"").slice(-4),campus=String(r.campus||"").trim();
     if(!name||last4.length<4){skip++;continue}
     const id=await keyOf(cur,name,last4);
-    if(have.has(id))continue;have.add(id);
-    add.push({id,name,dept:String(r.dept||"").trim()});
+    if(byId.has(id)){const o=byId.get(id);if(campus&&o.campus!==campus){upd.push({id,campus});o.campus=campus}continue}
+    if(seen.has(id))continue;seen.add(id);
+    add.push({id,name,dept:String(r.dept||"").trim(),campus});
   }
-  if(!add.length){alert(`추가할 인원이 없습니다.${skip?` (형식 오류 ${skip}행 제외)`:""}`);return}
-  if(!confirm(`${add.length}명을 추가합니다.${skip?`\n형식 오류로 제외된 행: ${skip}`:""}`))return;
-  for(let i=0;i<add.length;i+=400){
+  if(!add.length&&!upd.length){alert(`추가하거나 갱신할 인원이 없습니다.${skip?` (형식 오류 ${skip}행 제외)`:""}`);return}
+  if(!confirm(`${add.length}명을 추가하고, 기존 ${upd.length}명의 캠퍼스를 갱신합니다.${skip?`\n형식 오류로 제외된 행: ${skip}`:""}`))return;
+  const ops=[...add.map(m=>({set:m})),...upd.map(u=>({upd:u}))];
+  for(let i=0;i<ops.length;i+=400){
     const b=writeBatch(db);
-    add.slice(i,i+400).forEach(m=>b.set(doc(db,"sessions",cur,"members",m.id),{name:m.name,dept:m.dept,checkedIn:false,checkedInAt:null}));
+    ops.slice(i,i+400).forEach(o=>{
+      if(o.set)b.set(doc(db,"sessions",cur,"members",o.set.id),{name:o.set.name,dept:o.set.dept,campus:o.set.campus,checkedIn:false,checkedInAt:null});
+      else b.update(doc(db,"sessions",cur,"members",o.upd.id),{campus:o.upd.campus});
+    });
     await b.commit();
   }
   const f=$("#f");if(f)f.value="";
@@ -277,7 +286,7 @@ function showQR(){
 
 function exportXlsx(){
   const s=sessions.find(x=>x.id===cur);
-  const ws=XLSX.utils.json_to_sheet(members.map(m=>({이름:m.name,소속:m.dept||"",상태:m.checkedIn?"참석":"미참석",확인시각:m.checkedInAt?.toDate?m.checkedInAt.toDate().toLocaleString("ko-KR"):""})));
+  const ws=XLSX.utils.json_to_sheet(members.map(m=>({이름:m.name,캠퍼스:m.campus||"",소속:m.dept||"",상태:m.checkedIn?"참석":"미참석",확인시각:m.checkedInAt?.toDate?m.checkedInAt.toDate().toLocaleString("ko-KR"):""})));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"참석현황");
   XLSX.writeFile(wb,`${s.title}_참석현황.xlsx`);
 }
