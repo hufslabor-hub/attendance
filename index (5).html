@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>총회 참석자 확인</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#16213a;--mute:#6a7385;--line:#dfe2e8;--acc:#1f3a8a;--red:#c8312b;--ok:#0f7a55;--okbg:#e3f4ec}
+@media(prefers-color-scheme:dark){:root{--bg:#101522;--card:#192034;--ink:#eef1f7;--mute:#9aa3b8;--line:#2b3550;--acc:#8fa8ff;--red:#ff7a72;--ok:#4fd1a1;--okbg:#17372d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:960px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:-.02em}h2{font-size:17px;margin:0 0 10px}
+.mute{color:var(--mute);font-size:14px}
+input,select{width:100%;padding:13px 14px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+label{display:block;font-size:14px;font-weight:600;margin:14px 0 6px}
+button{font:inherit;font-weight:600;padding:11px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media(prefers-color-scheme:dark){button.p{color:#0b1020}}
+button.big{width:100%;padding:15px;font-size:17px;margin-top:20px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto}.grow{flex:1 1 160px!important}
+.stat{display:flex;align-items:baseline;gap:10px;margin:8px 0 10px}
+.stat b{font-size:44px;line-height:1;letter-spacing:-.03em}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok);transition:width .4s}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+th{font-size:13px;color:var(--mute);font-weight:600}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:13px;font-weight:600;background:var(--bg);color:var(--mute)}
+.tag.in{background:var(--okbg);color:var(--ok)}
+.tabs button{padding:8px 13px}.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.msg{margin-top:16px;padding:14px;border-radius:8px;font-weight:600}
+.msg.ok{background:var(--okbg);color:var(--ok)}.msg.no{background:#fde8e7;color:#9d1f1a}
+@media(prefers-color-scheme:dark){.msg.no{background:#3d1a19;color:#ff9a93}}
+#modal{position:fixed;inset:0;background:rgba(10,14,25,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+#modal.on{display:flex}
+#qrbox{background:#fff;color:#111;border-radius:12px;padding:28px;text-align:center;max-width:420px;width:100%}
+#qrbox h2{font-size:24px;margin:0 0 4px}#qr{display:flex;justify-content:center;margin:16px 0}
+.scroll{overflow-x:auto}
+@media print{body>*:not(#modal){display:none!important}#modal{position:static;background:none;display:block}#qrbox{margin:0 auto}.noprint{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="mute">불러오는 중…</p></div>
+<div id="modal"><div id="qrbox"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,collection,doc,getDoc,setDoc,addDoc,updateDoc,onSnapshot,query,orderBy,serverTimestamp,writeBatch}
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged}
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+/* ▼▼ Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹)의 설정값으로 교체 ▼▼ */
+const firebaseConfig={
+apiKey: "AIzaSyBCdPAcgpf-nFpriAh6xPcH9B6J2oacHzg",
+  authDomain: "hufs-union-attendance.firebaseapp.com",
+  projectId: "hufs-union-attendance",
+  appId: "1:539700502440:web:7859b57b608737d0e5479d"
+};
+// 조합원 DB(Apps Script 웹앱) 주소: /exec 까지만 입력
+const MEMBER_API="https://script.google.com/macros/s/AKfycbznLTBJQIn91BLU-wyCGpehykUlWM9Q7rsts5pHr9nA17qFMrMtWB3nxlY2P54jNyc/exec";
+// 참석 명단에서 제외할 그룹(상태) 표기 — 필요하면 수정
+const EXCLUDE_STATUS=["퇴직","자격정지"];
+/* ▲▲ */
+
+const app=initializeApp(firebaseConfig),db=getFirestore(app),auth=getAuth(app);
+const $=s=>document.querySelector(s),root=$("#app");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sid=new URLSearchParams(location.search).get("s");
+
+// 이름+전화번호 뒤 4자리 → 문서 ID(해시). 명단 목록을 공개하지 않고도 본인 확인이 가능
+const normName=n=>String(n).replace(/\s+/g,"");
+async function keyOf(s,name,last4){
+  const b=new TextEncoder().encode(`${s}|${normName(name)}|${last4}`);
+  const h=await crypto.subtle.digest("SHA-256",b);
+  return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+
+/* ───────── 참석자 화면 (QR로 접속) ───────── */
+async function attendee(){
+  let title="총회";
+  try{const s=await getDoc(doc(db,"sessions",sid));if(!s.exists())throw 0;title=s.data().title}
+  catch{root.innerHTML=`<div class="card"><h1>유효하지 않은 QR입니다</h1><p class="mute">현장 안내자에게 문의해 주세요.</p></div>`;return}
+  root.innerHTML=`<div class="card"><h1>${esc(title)}</h1><p class="mute">참석 확인을 위해 아래 정보를 입력해 주세요.</p>
+  <label for="n">이름</label><input id="n" autocomplete="name" placeholder="홍길동">
+  <label for="p">전화번호 뒤 4자리</label><input id="p" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="1234">
+  <button class="p big" id="go">참석 확인</button><div id="r"></div></div>`;
+  $("#p").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"");
+  $("#go").onclick=async()=>{
+    const name=$("#n").value.trim(),p=$("#p").value,r=$("#r");
+    if(!name||p.length!==4){r.innerHTML=`<div class="msg no">이름과 전화번호 4자리를 모두 입력해 주세요.</div>`;return}
+    $("#go").disabled=true;
+    try{
+      const ref=doc(db,"sessions",sid,"members",await keyOf(sid,name,p)),s=await getDoc(ref);
+      if(!s.exists())r.innerHTML=`<div class="msg no">명단에서 확인되지 않습니다. 이름과 번호를 다시 확인하거나 접수처에 문의해 주세요.</div>`;
+      else if(s.data().checkedIn)r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님은 이미 참석 확인되었습니다.</div>`;
+      else{await updateDoc(ref,{checkedIn:true,checkedInAt:serverTimestamp()});
+        r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님, 참석 확인되었습니다.</div>`}
+    }catch(e){r.innerHTML=`<div class="msg no">처리하지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`}
+    $("#go").disabled=false;
+  };
+}
+
+/* ───────── 관리자 화면 ───────── */
+function login(){
+  root.innerHTML=`<div class="card" style="max-width:380px;margin:40px auto"><h1>총회 참석자 관리</h1><p class="mute">관리자 로그인</p>
+  <label for="e">이메일</label><input id="e" type="email" autocomplete="username">
+  <label for="w">비밀번호</label><input id="w" type="password" autocomplete="current-password">
+  <button class="p big" id="li">로그인</button><div id="r"></div></div>`;
+  $("#li").onclick=()=>signInWithEmailAndPassword(auth,$("#e").value,$("#w").value)
+    .catch(()=>$("#r").innerHTML=`<div class="msg no">이메일 또는 비밀번호가 맞지 않습니다.</div>`);
+}
+
+let unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
+function admin(){
+  root.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:12px">
+    <h1 style="margin:0">총회 참석자 관리</h1><button id="out">로그아웃</button></div>
+  <div class="card" style="margin-bottom:12px"><div class="row">
+    <select id="ss" class="grow" aria-label="총회 선택"></select>
+    <button id="new">새 총회 만들기</button></div></div>
+  <div id="main"></div>`;
+  $("#out").onclick=()=>signOut(auth);
+  $("#new").onclick=async()=>{
+    const t=prompt("총회 이름 (예: 2026년 정기총회)");if(!t)return;
+    const d=await addDoc(collection(db,"sessions"),{title:t.trim(),createdAt:serverTimestamp()});
+    cur=d.id;
+  };
+  $("#ss").onchange=e=>pick(e.target.value);
+  unsubS?.();
+  unsubS=onSnapshot(query(collection(db,"sessions"),orderBy("createdAt","desc")),snap=>{
+    sessions=snap.docs.map(d=>({id:d.id,...d.data()}));
+    $("#ss").innerHTML=sessions.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join("")||`<option value="">총회 없음</option>`;
+    if(!cur||!sessions.some(s=>s.id===cur))cur=sessions[0]?.id||null;
+    $("#ss").value=cur||"";pick(cur);
+  });
+}
+
+function pick(id){
+  cur=id||null;unsubM?.();members=[];
+  if(!cur){$("#main").innerHTML=`<div class="card"><p>'새 총회 만들기'로 첫 총회를 만들어 주세요.</p></div>`;return}
+  $("#main").innerHTML=`<div class="card">
+    <div class="row" style="margin-bottom:6px"><button class="p" id="db">조합원 DB에서 불러오기</button><button id="up">엑셀로 올리기</button>
+      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button>
+      <input id="f" type="file" accept=".xlsx,.xls,.csv" hidden></div>
+    <p class="mute" style="margin:6px 0 0">조합원 DB 또는 엑셀(첫 행에 '이름', '전화번호', 선택 '소속')에서 불러옵니다. 다시 불러오면 새 인원만 추가됩니다.</p>
+    <div class="stat"><b id="n1">0</b><span class="mute" id="n2"></span></div>
+    <div class="bar"><i id="bar" style="width:0"></i></div>
+    <div class="row" style="margin:16px 0 8px"><input id="s" class="grow" placeholder="이름·소속 검색">
+      <span class="tabs row" id="tabs"><button data-f="all" class="on">전체</button><button data-f="in">참석</button><button data-f="out">미참석</button></span></div>
+    <div class="scroll"><table><thead><tr><th>이름</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
+  $("#up").onclick=()=>$("#f").click();$("#db").onclick=syncDb;
+  $("#f").onchange=e=>upload(e.target.files[0]);
+  $("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
+  $("#s").oninput=e=>{q=e.target.value.trim();draw()};
+  $("#tabs").onclick=e=>{const f=e.target.dataset.f;if(!f)return;filter=f;
+    document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.f===f));draw()};
+  unsubM=onSnapshot(collection(db,"sessions",cur,"members"),snap=>{
+    members=snap.docs.map(d=>({id:d.id,...d.data()}));
+    members.sort((a,b)=>a.name.localeCompare(b.name,"ko"));draw();
+  });
+}
+
+const fmt=t=>t?.toDate?t.toDate().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
+function draw(){
+  const tot=members.length,inn=members.filter(m=>m.checkedIn).length;
+  $("#n1").textContent=inn;$("#n2").textContent=`/ ${tot}명 참석 (${tot?Math.round(inn/tot*100):0}%)`;
+  $("#bar").style.width=(tot?inn/tot*100:0)+"%";
+  const list=members.filter(m=>(filter==="all"||(filter==="in")===!!m.checkedIn)&&(!q||(m.name+(m.dept||"")).includes(q)));
+  $("#tb").innerHTML=list.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.dept)}</td>
+    <td><span class="tag ${m.checkedIn?"in":""}">${m.checkedIn?"참석":"미참석"}</span></td><td class="mute">${fmt(m.checkedInAt)}</td>
+    <td><button data-id="${m.id}">${m.checkedIn?"취소":"수동 확인"}</button></td></tr>`).join("")
+    ||`<tr><td colspan="5" class="mute">${tot?"조건에 맞는 인원이 없습니다.":"엑셀로 명단을 올려 주세요."}</td></tr>`;
+  $("#tb").onclick=async e=>{const id=e.target.dataset.id;if(!id)return;const m=members.find(x=>x.id===id);
+    await updateDoc(doc(db,"sessions",cur,"members",id),m.checkedIn?{checkedIn:false,checkedInAt:null}:{checkedIn:true,checkedInAt:serverTimestamp()})};
+}
+
+async function upload(file){
+  if(!file)return;
+  const wb=XLSX.read(await file.arrayBuffer()),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
+  const get=(r,keys)=>{for(const k in r)if(keys.includes(k.replace(/\s/g,"")))return r[k];return""};
+  await addMembers(rows.map(r=>({name:get(r,["이름","성명"]),phone:get(r,["전화번호","휴대폰","연락처","핸드폰"]),dept:get(r,["소속","지부","부서"])})));
+}
+
+async function syncDb(){
+  if(MEMBER_API.includes("YOUR_")){alert("index.html의 MEMBER_API에 Apps Script 웹앱 주소를 입력해 주세요.");return}
+  const t=localStorage.getItem("mtk")||prompt("조합원 DB 연동 키(ATTEND_API_KEY)를 입력해 주세요");if(!t)return;
+  try{
+    const r=await fetch(MEMBER_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"attend",key:t})});
+    const j=await r.json();
+    if(j.error)throw new Error(j.error);
+    localStorage.setItem("mtk",t);
+    const ok=j.members.filter(m=>!EXCLUDE_STATUS.some(x=>(m.status||"").includes(x)));
+    await addMembers(ok.map(m=>({name:m.name,phone:m.phone4,dept:m.dept})));
+  }catch(e){localStorage.removeItem("mtk");alert("조합원 DB를 불러오지 못했습니다. ("+(e.message||"연결 실패")+")\n웹앱 주소·배포 권한·키를 확인해 주세요.")}
+}
+
+async function addMembers(list){
+  const have=new Set(members.map(m=>m.id)),add=[];let skip=0;
+  for(const r of list){
+    const name=String(r.name||"").trim(),last4=String(r.phone||"").replace(/\D/g,"").slice(-4);
+    if(!name||last4.length<4){skip++;continue}
+    const id=await keyOf(cur,name,last4);
+    if(have.has(id))continue;have.add(id);
+    add.push({id,name,dept:String(r.dept||"").trim()});
+  }
+  if(!add.length){alert(`추가할 인원이 없습니다.${skip?` (형식 오류 ${skip}행 제외)`:""}`);return}
+  if(!confirm(`${add.length}명을 추가합니다.${skip?`\n형식 오류로 제외된 행: ${skip}`:""}`))return;
+  for(let i=0;i<add.length;i+=400){
+    const b=writeBatch(db);
+    add.slice(i,i+400).forEach(m=>b.set(doc(db,"sessions",cur,"members",m.id),{name:m.name,dept:m.dept,checkedIn:false,checkedInAt:null}));
+    await b.commit();
+  }
+  const f=$("#f");if(f)f.value="";
+}
+
+function showQR(){
+  const s=sessions.find(x=>x.id===cur),url=`${location.origin}${location.pathname}?s=${cur}`;
+  $("#qrbox").innerHTML=`<h2>${esc(s.title)}</h2><div>스마트폰 카메라로 QR을 비춰<br>참석 확인을 해 주세요</div><div id="qr"></div>
+    <div class="mute" style="word-break:break-all;font-size:12px">${esc(url)}</div>
+    <div class="row noprint" style="justify-content:center;margin-top:16px"><button onclick="print()">인쇄</button><button id="cl">닫기</button></div>`;
+  new QRCode($("#qr"),{text:url,width:280,height:280,correctLevel:QRCode.CorrectLevel.M});
+  $("#modal").classList.add("on");$("#cl").onclick=()=>$("#modal").classList.remove("on");
+}
+
+function exportXlsx(){
+  const s=sessions.find(x=>x.id===cur);
+  const ws=XLSX.utils.json_to_sheet(members.map(m=>({이름:m.name,소속:m.dept||"",상태:m.checkedIn?"참석":"미참석",확인시각:m.checkedInAt?.toDate?m.checkedInAt.toDate().toLocaleString("ko-KR"):""})));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"참석현황");
+  XLSX.writeFile(wb,`${s.title}_참석현황.xlsx`);
+}
+
+/* ───────── 시작 ───────── */
+if(sid)attendee();
+else onAuthStateChanged(auth,u=>{if(u)admin();else{unsubS?.();unsubM?.();login()}});
+</script>
+</body>
+</html>
