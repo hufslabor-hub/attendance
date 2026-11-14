@@ -102,6 +102,20 @@ function sendCodes_(body, members) {
     if (CODE_EXCLUDE.some(function (x) { return m.status.indexOf(x) >= 0; })) return false;
     return !only || m.name.replace(/\s+/g, '') === only;
   });
+  // 테스트 발송: 지정한 주소로 1통만 보냄 (조합원 이름을 주면 그 조합원의 실제 번호, 없으면 샘플 번호)
+  if (body.test) {
+    const to = String(body.test).trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return apiJson_({ error: 'invalid-email' });
+    let nm = '홍길동(샘플)', cd = '1234', real = false;
+    if (only) { if (!list[0]) return apiJson_({ error: 'member-not-found' }); nm = list[0].name; cd = list[0].code; real = true; }
+    MailApp.sendEmail({
+      to: to, name: MAIL_SENDER,
+      subject: '[테스트] [' + String(body.title || '총회').slice(0, 80) + '] 참석 확인 인증번호 안내',
+      htmlBody: mailHtml_(nm, String(body.title || '총회').slice(0, 80), cd, body.link,
+        real ? '※ 테스트 발송입니다. 위 번호는 ' + nm + ' 조합원의 실제 인증번호입니다.' : '※ 테스트 발송입니다. 위 번호는 샘플이며 실제 참석 확인에는 사용할 수 없습니다.')
+    });
+    return apiJson_({ ok: true, test: true, sample: !real, name: nm, quota: MailApp.getRemainingDailyQuota() });
+  }
   const off = Math.max(0, Number(body.offset) || 0), lim = Math.min(100, Number(body.limit) || 60);
   const part = list.slice(off, off + lim);
   const title = String(body.title || '총회').slice(0, 80);
@@ -116,16 +130,22 @@ function sendCodes_(body, members) {
         to: m.email,
         subject: '[' + title + '] 참석 확인 인증번호 안내',
         name: MAIL_SENDER,
-        htmlBody: '<p>' + esc(m.name) + ' 조합원님, 안녕하세요.</p>' +
-          '<p><b>' + esc(title) + '</b>의 참석 확인과 투표에 사용하는 개인별 인증번호입니다.</p>' +
-          '<p style="font-size:28px;letter-spacing:6px;margin:12px 0"><b>' + m.code + '</b></p>' +
-          '<p>현장에서 안내되는 QR을 스마트폰으로 비추고, <b>이름 · 전화번호 뒤 4자리 · 위 인증번호</b>를 입력해 주세요.</p>' +
-          (body.link ? '<p><a href="' + esc(body.link) + '">참석 확인 페이지 열기</a></p>' : '') +
-          '<p style="color:#777;font-size:13px">이 번호는 본인 확인용이므로 다른 사람에게 알려주지 마세요.</p>'
+        htmlBody: mailHtml_(m.name, title, m.code, body.link, '')
       });
       sent++;
     } catch (err) { failed.push(m.name); }
   }
   const next = (!stopped && off + lim < list.length) ? off + lim : null;
   return apiJson_({ ok: true, total: list.length, sent: sent, noEmail: noEmail, failed: failed, next: next, stopped: stopped, quota: MailApp.getRemainingDailyQuota() });
+}
+
+function mailHtml_(name, title, code, link, note) {
+  const esc = function (x) { return String(x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  return (note ? '<p style="background:#fff3cd;padding:8px 12px;border-radius:6px">' + esc(note) + '</p>' : '') +
+    '<p>' + esc(name) + ' 조합원님, 안녕하세요.</p>' +
+    '<p><b>' + esc(title) + '</b>의 참석 확인과 투표에 사용하는 개인별 인증번호입니다.</p>' +
+    '<p style="font-size:28px;letter-spacing:6px;margin:12px 0"><b>' + code + '</b></p>' +
+    '<p>현장에서 안내되는 QR을 스마트폰으로 비추고, <b>이름 · 전화번호 뒤 4자리 · 위 인증번호</b>를 입력해 주세요.</p>' +
+    (link ? '<p><a href="' + esc(link) + '">참석 확인 페이지 열기</a></p>' : '') +
+    '<p style="color:#777;font-size:13px">이 번호는 본인 확인용이므로 다른 사람에게 알려주지 마세요.</p>';
 }

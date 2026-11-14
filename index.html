@@ -286,7 +286,7 @@ function pick(id){
   if(!cur){$("#main").innerHTML=`<div class="card"><p>'새 총회 만들기'로 첫 총회를 만들어 주세요.</p></div>`;return}
   $("#main").innerHTML=`<div class="card">
     <div class="row" style="margin-bottom:6px"><button class="p" id="db">조합원 DB에서 불러오기</button><button id="up">엑셀로 올리기</button>
-      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button><button id="pj">프로젝터 화면</button>${needCode()?`<button class="p" id="mailc">인증번호 메일 발송</button>`:""}
+      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button><button id="pj">프로젝터 화면</button>${needCode()?`<button class="p" id="mailc">인증번호 메일 발송</button><button id="mailt">테스트 메일</button>`:""}
       <input id="f" type="file" accept=".xlsx,.xls,.csv" hidden></div>
     ${needCode()?`<p class="mute" style="margin:6px 0 0">🔐 이 총회는 <b>이메일 인증번호</b>를 사용합니다. 명단을 불러온 뒤 <b>인증번호 메일 발송</b>을 눌러 주세요. 이메일이 없는 조합원은 수동 확인으로 처리할 수 있습니다.</p>`:""}
     <p class="mute" style="margin:6px 0 0">조합원 DB 또는 엑셀(첫 행에 '이름', '전화번호', 선택 '소속')에서 불러옵니다. 다시 불러오면 새 인원만 추가됩니다.</p>
@@ -305,7 +305,7 @@ function pick(id){
     <div class="scroll"><table><thead><tr><th>이름</th><th>캠퍼스</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   $("#up").onclick=()=>$("#f").click();$("#db").onclick=syncDb;
   $("#f").onchange=e=>upload(e.target.files[0]);
-  $("#pj").onclick=openProj;if($("#mailc"))$("#mailc").onclick=()=>sendCodes("");$("#aa").onclick=addAgenda;$("#ag").onclick=agAct;$("#mode").onclick=e=>{const b=e.target.closest("[data-m]");if(b)setMode(b.dataset.m)};$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
+  $("#pj").onclick=openProj;if($("#mailc")){$("#mailc").onclick=()=>sendCodes("");$("#mailt").onclick=testMail}$("#aa").onclick=addAgenda;$("#ag").onclick=agAct;$("#mode").onclick=e=>{const b=e.target.closest("[data-m]");if(b)setMode(b.dataset.m)};$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
   $("#s").oninput=e=>{q=e.target.value.trim();draw()};campusKey="";$("#cf").onchange=e=>{campusF=e.target.value;draw()};
   $("#tabs").onclick=e=>{const f=e.target.dataset.f;if(!f)return;filter=f;
     document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.f===f));draw()};
@@ -442,6 +442,22 @@ function drawVP(){
   $("#vyn").textContent=`가결 ${j.need}표`;$("#vnn").textContent=`부결 확정 ${j.against}표`;
   $("#vpt").textContent=`투표 ${vt.y+vt.n}명 / 의결 기준 ${j.b}명`;
   $("#vs").textContent=j.msg;$("#vd").textContent=j.detail;if(j.st!=="go")o.classList.add(j.st);
+}
+
+async function testMail(){
+  if(MEMBER_API.includes("YOUR_")){alert("index.html의 MEMBER_API를 먼저 입력해 주세요.");return}
+  const t=localStorage.getItem("mtk")||prompt("조합원 DB 연동 키(ATTEND_API_KEY)를 입력해 주세요");if(!t)return;
+  let to=prompt("테스트 메일을 받을 이메일 주소를 입력해 주세요.",localStorage.getItem("testmail")||"");if(!to)return;
+  to=to.trim();
+  const nm=prompt("실제 조합원의 인증번호로 테스트하려면 그 조합원 이름을 입력하세요.\n(비워두면 샘플 번호 1234로 발송되며, 실제 참석 확인에는 쓸 수 없습니다)","")||"";
+  const ses=sessions.find(x=>x.id===cur),link=`${location.origin}${location.pathname}?s=${cur}`;
+  try{
+    const r=await(await fetch(MEMBER_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"sendcodes",key:t,sid:cur,title:ses.title,link,test:to,only:nm.trim()})})).json();
+    if(r.error)throw new Error(r.error==="invalid-email"?"이메일 주소 형식이 올바르지 않습니다":r.error==="member-not-found"?"해당 이름의 대상 조합원을 찾지 못했습니다":r.error);
+    localStorage.setItem("mtk",t);localStorage.setItem("testmail",to);
+    alert(`${to} 로 테스트 메일을 보냈습니다.\n`+(r.sample?"샘플 번호(1234)가 들어 있습니다.":`${r.name}님의 실제 인증번호가 들어 있습니다. 이 번호로 참석 확인 화면을 시험해 볼 수 있습니다.`)+`\n(오늘 남은 발송 가능 수: ${r.quota})`);
+  }catch(e){alert("테스트 메일을 보내지 못했습니다. ("+(e.message||"연결 실패")+")")}
 }
 
 /* ───────── 개인별 인증번호 메일 발송 ───────── */
