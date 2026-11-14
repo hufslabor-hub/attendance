@@ -149,31 +149,33 @@ const sid=new URLSearchParams(location.search).get("s");
 
 // 이름+전화번호 뒤 4자리 → 문서 ID(해시). 명단 목록을 공개하지 않고도 본인 확인이 가능
 const normName=n=>String(n).replace(/\s+/g,"");
-async function keyOf(s,name,last4){
-  const b=new TextEncoder().encode(`${s}|${normName(name)}|${last4}`);
+async function keyOf(s,name,last4,code=""){
+  const b=new TextEncoder().encode(`${s}|${normName(name)}|${last4}`+(code?`|${code}`:""));
   const h=await crypto.subtle.digest("SHA-256",b);
   return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 
 /* ───────── 참석자 화면 (QR로 접속) ───────── */
 async function attendee(){
-  let title="총회";
-  try{const s=await getDoc(doc(db,"sessions",sid));if(!s.exists())throw 0;title=s.data().title}
+  let title="총회",need=false;
+  try{const s=await getDoc(doc(db,"sessions",sid));if(!s.exists())throw 0;title=s.data().title;need=!!s.data().needCode}
   catch{root.innerHTML=`<div class="card"><h1>유효하지 않은 QR입니다</h1><p class="mute">현장 안내자에게 문의해 주세요.</p></div>`;return}
   root.innerHTML=`<div class="card"><h1>${esc(title)}</h1><p class="mute">참석 확인을 위해 아래 정보를 입력해 주세요.</p>
   <label for="n">이름</label><input id="n" autocomplete="name" placeholder="홍길동">
   <label for="p">전화번호 뒤 4자리</label><input id="p" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="1234">
+  ${need?`<label for="c">이메일로 받은 인증번호 4자리</label><input id="c" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="one-time-code">`:""}
   <button class="p big" id="go">참석 확인</button><div id="r"></div></div>`;
   $("#p").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"");
+  if(need)$("#c").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"");
   $("#go").onclick=async()=>{
-    const name=$("#n").value.trim(),p=$("#p").value,r=$("#r");
-    if(!name||p.length!==4){r.innerHTML=`<div class="msg no">이름과 전화번호 4자리를 모두 입력해 주세요.</div>`;return}
+    const name=$("#n").value.trim(),p=$("#p").value,code=need?$("#c").value:"",r=$("#r");
+    if(!name||p.length!==4||(need&&code.length!==4)){r.innerHTML=`<div class="msg no">${need?"이름, 전화번호 4자리, 인증번호 4자리를":"이름과 전화번호 4자리를 모두"} 입력해 주세요.</div>`;return}
     $("#go").disabled=true;
     try{
-      const ref=doc(db,"sessions",sid,"members",await keyOf(sid,name,p)),s=await getDoc(ref);
+      const ref=doc(db,"sessions",sid,"members",await keyOf(sid,name,p,code)),s=await getDoc(ref);
       if(s.exists())try{localStorage.setItem("mid:"+sid,ref.id)}catch{}
       const vl=`<p style="margin-top:14px"><a href="?s=${sid}&v=1">투표 페이지로 이동 →</a></p>`;
-      if(!s.exists())r.innerHTML=`<div class="msg no">명단에서 확인되지 않습니다. 이름과 번호를 다시 확인하거나 접수처에 문의해 주세요.</div>`;
+      if(!s.exists())r.innerHTML=`<div class="msg no">명단에서 확인되지 않습니다. 입력한 정보를 다시 확인하거나 접수처에 문의해 주세요.</div>`;
       else if(s.data().checkedIn)r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님은 이미 참석 확인되었습니다.</div>${vl}`;
       else{await updateDoc(ref,{checkedIn:true,checkedInAt:serverTimestamp()});
         r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님, 참석 확인되었습니다.</div>${vl}`}
@@ -185,8 +187,8 @@ async function attendee(){
 
 /* ───────── 투표 화면 (QR로 접속) ───────── */
 async function voter(){
-  let title="총회";
-  try{const t=await getDoc(doc(db,"sessions",sid));if(!t.exists())throw 0;title=t.data().title}
+  let title="총회",need=false;
+  try{const t=await getDoc(doc(db,"sessions",sid));if(!t.exists())throw 0;title=t.data().title;need=!!t.data().needCode}
   catch{root.innerHTML=`<div class="card"><h1>유효하지 않은 QR입니다</h1></div>`;return}
   const verify=async id=>{try{const m=await getDoc(doc(db,"sessions",sid,"members",id));return m.exists()?m.data():null}catch{return null}};
   let mid=null;try{mid=localStorage.getItem("mid:"+sid)}catch{}
@@ -194,12 +196,14 @@ async function voter(){
   if(me&&me.checkedIn)return start(mid,me);
   root.innerHTML=`<div class="card"><h1>${esc(title)}</h1><p class="mute">투표 전, 본인 확인을 해 주세요. (참석 확인을 마친 분만 투표할 수 있습니다)</p>
     <label for="n">이름</label><input id="n" autocomplete="name"><label for="p">전화번호 뒤 4자리</label><input id="p" inputmode="numeric" maxlength="4">
+    ${need?`<label for="c">이메일로 받은 인증번호 4자리</label><input id="c" inputmode="numeric" maxlength="4" autocomplete="one-time-code">`:""}
     <button class="p big" id="go">확인</button><div id="r"></div></div>`;
   $("#p").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"");
+  if(need)$("#c").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"");
   $("#go").onclick=async()=>{
-    const name=$("#n").value.trim(),p=$("#p").value,r=$("#r");
-    if(!name||p.length!==4){r.innerHTML=`<div class="msg no">이름과 전화번호 4자리를 입력해 주세요.</div>`;return}
-    const id=await keyOf(sid,name,p),m=await verify(id);
+    const name=$("#n").value.trim(),p=$("#p").value,code=need?$("#c").value:"",r=$("#r");
+    if(!name||p.length!==4||(need&&code.length!==4)){r.innerHTML=`<div class="msg no">${need?"이름, 전화번호 4자리, 인증번호 4자리를":"이름과 전화번호 4자리를"} 입력해 주세요.</div>`;return}
+    const id=await keyOf(sid,name,p,code),m=await verify(id);
     if(!m)r.innerHTML=`<div class="msg no">명단에서 확인되지 않습니다.</div>`;
     else if(!m.checkedIn)r.innerHTML=`<div class="msg no">먼저 참석 확인이 필요합니다.</div><p style="margin-top:12px"><a href="?s=${sid}">참석 확인하러 가기 →</a></p>`;
     else{try{localStorage.setItem("mid:"+sid,id)}catch{}start(id,m)}
@@ -247,6 +251,7 @@ function login(){
     $("#r").innerHTML=`<div class="msg no">${m[c]||"로그인하지 못했습니다."}<br><small>오류 코드: ${esc(c)}</small></div>`});
 }
 
+const needCode=()=>!!sessions.find(x=>x.id===cur)?.needCode;
 let agendas=[],vcur=null,vt={y:0,n:0},vqrUrl="",unsubA,unsubV,campusF="",campusKey="",shownCur=null,unsubD,unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
 function admin(){
   root.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:12px">
@@ -258,7 +263,8 @@ function admin(){
   $("#out").onclick=()=>signOut(auth);
   $("#new").onclick=async()=>{
     const t=prompt("총회 이름 (예: 2026년 정기총회)");if(!t)return;
-    const d=await addDoc(collection(db,"sessions"),{title:t.trim(),createdAt:serverTimestamp()});
+    const nc=confirm("이메일 인증번호를 사용할까요?\n\n[확인] 이름 + 전화번호 뒤 4자리 + 이메일로 받은 인증번호\n[취소] 이름 + 전화번호 뒤 4자리만");
+    const d=await addDoc(collection(db,"sessions"),{title:t.trim(),needCode:nc,createdAt:serverTimestamp()});
     cur=d.id;
   };
   $("#ss").onchange=e=>{shownCur=e.target.value;pick(shownCur)};
@@ -268,6 +274,10 @@ function admin(){
     $("#ss").innerHTML=sessions.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join("")||`<option value="">총회 없음</option>`;
     if(!cur||!sessions.some(s=>s.id===cur))cur=sessions[0]?.id||null;
     $("#ss").value=cur||"";if(cur!==shownCur){shownCur=cur;pick(cur)}
+  },err=>{
+    $("#ss").innerHTML=`<option value="">불러오지 못함</option>`;
+    $("#main").innerHTML=`<div class="card"><div class="msg no">총회 목록을 불러오지 못했습니다. (${esc(err.code||err.message)})<br>
+      ${err.code==="permission-denied"?"Firestore 규칙의 관리자 이메일이 지금 로그인한 계정과 같은지 확인해 주세요. 로그인한 계정: "+esc(auth.currentUser?.email||""):"브라우저 콘솔(F12)의 오류 내용을 확인해 주세요."}</div></div>`;
   });
 }
 
@@ -276,8 +286,9 @@ function pick(id){
   if(!cur){$("#main").innerHTML=`<div class="card"><p>'새 총회 만들기'로 첫 총회를 만들어 주세요.</p></div>`;return}
   $("#main").innerHTML=`<div class="card">
     <div class="row" style="margin-bottom:6px"><button class="p" id="db">조합원 DB에서 불러오기</button><button id="up">엑셀로 올리기</button>
-      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button><button id="pj">프로젝터 화면</button>
+      <button id="qrb">QR 보기·인쇄</button><button id="ex">결과 내려받기</button><button id="pj">프로젝터 화면</button>${needCode()?`<button class="p" id="mailc">인증번호 메일 발송</button>`:""}
       <input id="f" type="file" accept=".xlsx,.xls,.csv" hidden></div>
+    ${needCode()?`<p class="mute" style="margin:6px 0 0">🔐 이 총회는 <b>이메일 인증번호</b>를 사용합니다. 명단을 불러온 뒤 <b>인증번호 메일 발송</b>을 눌러 주세요. 이메일이 없는 조합원은 수동 확인으로 처리할 수 있습니다.</p>`:""}
     <p class="mute" style="margin:6px 0 0">조합원 DB 또는 엑셀(첫 행에 '이름', '전화번호', 선택 '소속')에서 불러옵니다. 다시 불러오면 새 인원만 추가됩니다.</p>
     <div class="stat"><b id="n1">0</b><span class="mute" id="n2"></span></div>
     <div class="bar"><i id="bar" style="width:0"></i></div>
@@ -294,7 +305,7 @@ function pick(id){
     <div class="scroll"><table><thead><tr><th>이름</th><th>캠퍼스</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   $("#up").onclick=()=>$("#f").click();$("#db").onclick=syncDb;
   $("#f").onchange=e=>upload(e.target.files[0]);
-  $("#pj").onclick=openProj;$("#aa").onclick=addAgenda;$("#ag").onclick=agAct;$("#mode").onclick=e=>{const b=e.target.closest("[data-m]");if(b)setMode(b.dataset.m)};$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
+  $("#pj").onclick=openProj;if($("#mailc"))$("#mailc").onclick=()=>sendCodes("");$("#aa").onclick=addAgenda;$("#ag").onclick=agAct;$("#mode").onclick=e=>{const b=e.target.closest("[data-m]");if(b)setMode(b.dataset.m)};$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
   $("#s").oninput=e=>{q=e.target.value.trim();draw()};campusKey="";$("#cf").onchange=e=>{campusF=e.target.value;draw()};
   $("#tabs").onclick=e=>{const f=e.target.dataset.f;if(!f)return;filter=f;
     document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.f===f));draw()};
@@ -307,7 +318,7 @@ function pick(id){
     vmode=d.vmode==="two"?"two":"maj";votes=Number(d.votes)||0;drawMode();drawProj();
     const nv=d.curAgenda||null;if(nv!==vcur){vcur=nv;watchVotes()}});
   unsubA=onSnapshot(query(collection(db,"sessions",cur,"agendas"),orderBy("createdAt")),snap=>{
-    agendas=snap.docs.map(d=>({id:d.id,...d.data()}));drawAgendas();drawVP()});
+    agendas=snap.docs.map(d=>({id:d.id,...d.data()}));drawAgendas();drawVP()},err=>console.error("agendas",err));
 }
 
 /* ───────── 프로젝터 화면: 총회 성립 요건 = 재적인원 과반수 출석 / 의결 = 출석 인원 과반수 찬성 ───────── */
@@ -433,6 +444,34 @@ function drawVP(){
   $("#vs").textContent=j.msg;$("#vd").textContent=j.detail;if(j.st!=="go")o.classList.add(j.st);
 }
 
+/* ───────── 개인별 인증번호 메일 발송 ───────── */
+async function sendCodes(only){
+  if(MEMBER_API.includes("YOUR_")){alert("index.html의 MEMBER_API를 먼저 입력해 주세요.");return}
+  const t=localStorage.getItem("mtk")||prompt("조합원 DB 연동 키(ATTEND_API_KEY)를 입력해 주세요");if(!t)return;
+  const ses=sessions.find(x=>x.id===cur),link=`${location.origin}${location.pathname}?s=${cur}`;
+  if(!only&&!confirm(`「${ses.title}」\n대상 조합원 전체에게 개인별 인증번호를 이메일로 발송합니다. 계속할까요?`))return;
+  const bt=$("#mailc"),label=bt?.textContent;if(bt)bt.disabled=true;
+  let off=0,sent=0,total=0,quota=null,stopped=false;const noMail=[],failed=[];
+  try{
+    for(;;){
+      const r=await(await fetch(MEMBER_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+        body:JSON.stringify({action:"sendcodes",key:t,sid:cur,title:ses.title,link,offset:off,limit:60,only:only||""})})).json();
+      if(r.error)throw new Error(r.error);
+      localStorage.setItem("mtk",t);
+      total=r.total;sent+=r.sent;quota=r.quota;noMail.push(...r.noEmail);failed.push(...r.failed);
+      if(bt)bt.textContent=`발송 중… ${Math.min(off+60,total)} / ${total}`;
+      if(r.stopped){stopped=true;break}
+      if(r.next==null)break;off=r.next;
+    }
+    alert(`발송 ${sent}명 / 대상 ${total}명`
+      +(noMail.length?`\n이메일 없음 ${noMail.length}명: ${noMail.slice(0,10).join(", ")}${noMail.length>10?" 외":""}`:"")
+      +(failed.length?`\n발송 실패 ${failed.length}명: ${failed.slice(0,10).join(", ")}`:"")
+      +(stopped?"\n⚠ 일일 메일 발송 한도에 도달해 중단되었습니다. 내일 다시 시도해 주세요.":"")
+      +(quota!=null?`\n(오늘 남은 발송 가능 수: ${quota})`:""));
+  }catch(e){alert("발송하지 못했습니다. ("+(e.message||"연결 실패")+")\n웹앱 배포 상태와 키, CODE_SECRET 설정을 확인해 주세요.")}
+  if(bt){bt.disabled=false;bt.textContent=label}
+}
+
 const fmt=t=>t?.toDate?t.toDate().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
 function draw(){
   const tot=members.length,inn=members.filter(m=>m.checkedIn).length;
@@ -445,15 +484,16 @@ function draw(){
   const list=members.filter(m=>(filter==="all"||(filter==="in")===!!m.checkedIn)&&(!campusF||(m.campus||"미지정")===campusF)&&(!q||(m.name+(m.dept||"")+(m.campus||"")).includes(q)));
   $("#tb").innerHTML=list.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.campus)}</td><td>${esc(m.dept)}</td>
     <td><span class="tag ${m.checkedIn?"in":""}">${m.checkedIn?"참석":"미참석"}</span></td><td class="mute">${fmt(m.checkedInAt)}</td>
-    <td><button data-id="${m.id}">${m.checkedIn?"취소":"수동 확인"}</button></td></tr>`).join("")
+    <td><button data-id="${m.id}">${m.checkedIn?"취소":"수동 확인"}</button>${needCode()?`<button data-r="${esc(m.name)}">번호 재전송</button>`:""}</td></tr>`).join("")
     ||`<tr><td colspan="6" class="mute">${tot?"조건에 맞는 인원이 없습니다.":"엑셀로 명단을 올려 주세요."}</td></tr>`;
   drawMode();drawProj();
-  $("#tb").onclick=async e=>{const id=e.target.dataset.id;if(!id)return;const m=members.find(x=>x.id===id);
+  $("#tb").onclick=async e=>{if(e.target.dataset.r){if(confirm(`${e.target.dataset.r}님에게 인증번호를 다시 보낼까요?`))sendCodes(e.target.dataset.r);return}const id=e.target.dataset.id;if(!id)return;const m=members.find(x=>x.id===id);
     await updateDoc(doc(db,"sessions",cur,"members",id),m.checkedIn?{checkedIn:false,checkedInAt:null}:{checkedIn:true,checkedInAt:serverTimestamp()})};
 }
 
 async function upload(file){
   if(!file)return;
+  if(needCode()){alert("이메일 인증번호를 사용하는 총회는 '조합원 DB에서 불러오기'로만 명단을 등록할 수 있습니다.");$("#f").value="";return}
   const wb=XLSX.read(await file.arrayBuffer()),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
   const get=(r,keys)=>{for(const k in r)if(keys.includes(k.replace(/\s/g,"")))return r[k];return""};
   await addMembers(rows.map(r=>({name:get(r,["이름","성명"]),phone:get(r,["전화번호","휴대폰","연락처","핸드폰"]),dept:get(r,["소속","지부","부서"]),campus:get(r,["캠퍼스","근무지"])})));
@@ -463,21 +503,21 @@ async function syncDb(){
   if(MEMBER_API.includes("YOUR_")){alert("index.html의 MEMBER_API에 Apps Script 웹앱 주소를 입력해 주세요.");return}
   const t=localStorage.getItem("mtk")||prompt("조합원 DB 연동 키(ATTEND_API_KEY)를 입력해 주세요");if(!t)return;
   try{
-    const r=await fetch(MEMBER_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"attend",key:t})});
+    const r=await fetch(MEMBER_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"attend",key:t,sid:needCode()?cur:""})});
     const j=await r.json();
     if(j.error)throw new Error(j.error);
     localStorage.setItem("mtk",t);
     const ok=j.members.filter(m=>!EXCLUDE_STATUS.some(x=>(m.status||"").includes(x)));
-    await addMembers(ok.map(m=>({name:m.name,phone:m.phone4,dept:m.dept,campus:m.campus})));
+    await addMembers(ok.map(m=>({name:m.name,phone:m.phone4,dept:m.dept,campus:m.campus,code:m.code})));
   }catch(e){localStorage.removeItem("mtk");alert("조합원 DB를 불러오지 못했습니다. ("+(e.message||"연결 실패")+")\n웹앱 주소·배포 권한·키를 확인해 주세요.")}
 }
 
 async function addMembers(list){
   const byId=new Map(members.map(m=>[m.id,m])),seen=new Set(byId.keys()),add=[],upd=[];let skip=0;
   for(const r of list){
-    const name=String(r.name||"").trim(),last4=String(r.phone||"").replace(/\D/g,"").slice(-4),campus=String(r.campus||"").trim();
-    if(!name||last4.length<4){skip++;continue}
-    const id=await keyOf(cur,name,last4);
+    const name=String(r.name||"").trim(),last4=String(r.phone||"").replace(/\D/g,"").slice(-4),campus=String(r.campus||"").trim(),code=needCode()?String(r.code||""):"";
+    if(!name||last4.length<4||(needCode()&&code.length!==4)){skip++;continue}
+    const id=await keyOf(cur,name,last4,code);
     if(byId.has(id)){const o=byId.get(id);if(campus&&o.campus!==campus){upd.push({id,campus});o.campus=campus}continue}
     if(seen.has(id))continue;seen.add(id);
     add.push({id,name,dept:String(r.dept||"").trim(),campus});
