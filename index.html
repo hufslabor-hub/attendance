@@ -78,6 +78,27 @@ th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;z-inde
 .mc b{display:block;font-size:16px;margin-bottom:2px}.mc span{display:block;font-size:14px;color:var(--mute)}
 .mc em{display:block;font-style:normal;font-size:14px;font-weight:700;color:var(--acc);margin-top:6px}
 .mc.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+#vp{position:fixed;inset:0;z-index:22;display:none;flex-direction:column;padding:calc(2.2*var(--u)) calc(4*var(--u));background:#0e1a33;color:#fff;line-height:1.15}
+#vp.on{display:flex}
+#vt{font-size:calc(3.4*var(--u));font-weight:800}#vm{font-size:calc(1.9*var(--u));opacity:.8;margin-top:calc(.3*var(--u))}
+#vp .vbody{display:flex;gap:calc(3*var(--u));align-items:center;flex:1;min-height:0;margin:calc(1.2*var(--u)) 0}
+#vp .vqr{flex:none;background:#fff;color:#0e1a33;border-radius:calc(1.2*var(--u));padding:calc(1.2*var(--u));text-align:center;font-weight:700;font-size:calc(1.7*var(--u))}
+#vqr{display:flex;justify-content:center;margin-bottom:calc(.6*var(--u))}#vqr img,#vqr canvas{max-width:100%}
+#vp .vres{flex:1;min-width:0}
+.vrow{display:flex;align-items:baseline;gap:calc(1.5*var(--u))}.vrow span{font-size:calc(3*var(--u));font-weight:700;width:calc(9*var(--u))}.vrow b{font-size:calc(8.5*var(--u));line-height:1;font-variant-numeric:tabular-nums;font-weight:800}
+.vrow.y b{color:#3ed598}.vrow.n b{color:#ff7a72}.vrow small{font-size:calc(2*var(--u));opacity:.7}
+.vbar{position:relative;height:calc(1.8*var(--u));background:#ffffff26;border-radius:calc(1*var(--u));margin:calc(.5*var(--u)) 0 calc(1.6*var(--u))}
+.vbar i{display:block;height:100%;border-radius:calc(1*var(--u));background:#3ed598;transition:width .5s}.vbar.n i{background:#ff7a72}
+.vbar u{position:absolute;top:calc(-.5*var(--u));bottom:calc(-.5*var(--u));width:calc(.25*var(--u));background:#fff;text-decoration:none;transform:translateX(-50%)}
+#vpt{font-size:calc(2*var(--u));opacity:.85}
+#vs{align-self:flex-start;font-size:calc(3.6*var(--u));font-weight:800;padding:calc(.5*var(--u)) calc(2*var(--u));border-radius:99px;background:#ffffff1f}
+#vp.pass #vs{background:#3ed598;color:#062a1c}#vp.fail #vs{background:#ff7a72;color:#3a0a07}
+#vd{font-size:calc(2.1*var(--u));margin-top:calc(.8*var(--u));opacity:.95;min-height:calc(5.5*var(--u))}
+#vc2{position:absolute;top:calc(.6*var(--u));right:calc(1.5*var(--u));background:transparent;color:#fff;border-color:#ffffff55;opacity:.6;font-size:calc(1.4*var(--u))}
+.ag td,.ag th{padding:8px 6px}.ag button{padding:7px 10px;font-size:14px;margin:0 2px 2px 0}
+.ag .y{color:var(--ok);font-weight:700}.ag .n{color:var(--red);font-weight:700}
+.vbtn{display:block;width:100%;padding:22px;font-size:22px;border-radius:12px;margin-top:12px;color:#fff;border:0}
+.vbtn.y{background:#0f7a55}.vbtn.n{background:#c8312b}.vbtn.g{background:var(--bg);color:var(--ink);border:1px solid var(--line);font-size:16px;padding:12px}
 @media(prefers-reduced-motion:reduce){.bump,.pop{animation:none}#pf{transition:none}}
 @media print{body>*:not(#modal){display:none!important}#modal{position:static;background:none;display:block}#qrbox{margin:0 auto}.noprint{display:none}}
 </style>
@@ -90,13 +111,20 @@ th{font-size:13px;color:var(--mute);font-weight:600;position:sticky;top:0;z-inde
   <div id="ps"></div><div id="pr"></div><div id="pv"></div>
   <div id="pctl"><span>의결 방식</span><button data-m="maj">과반수</button><button data-m="two">3분의 2</button><span class="sp"></span>
     <span>찬성</span><button data-a="-">−</button><b id="vc">0</b><button data-a="+">＋</button><button data-a="0">초기화</button></div></div>
+<div id="vp"><button id="vc2">닫기 (Esc)</button>
+  <div><div id="vt"></div><div id="vm"></div></div>
+  <div class="vbody"><div class="vqr"><div id="vqr"></div>QR을 비춰 투표하세요</div>
+    <div class="vres"><div class="vrow y"><span>찬성</span><b id="vy">0</b><small id="vyn"></small></div><div class="vbar"><i id="vyb" style="width:0"></i><u id="vym"></u></div>
+      <div class="vrow n"><span>반대</span><b id="vn">0</b><small id="vnn"></small></div><div class="vbar n"><i id="vnb" style="width:0"></i><u id="vnm"></u></div>
+      <div id="vpt"></div></div></div>
+  <div id="vs"></div><div id="vd"></div></div>
 <div id="modal"><div id="qrbox"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,collection,doc,getDoc,setDoc,addDoc,updateDoc,onSnapshot,query,orderBy,serverTimestamp,writeBatch}
+import {getFirestore,collection,doc,getDoc,setDoc,addDoc,deleteDoc,updateDoc,onSnapshot,query,orderBy,serverTimestamp,writeBatch}
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged}
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -143,13 +171,69 @@ async function attendee(){
     $("#go").disabled=true;
     try{
       const ref=doc(db,"sessions",sid,"members",await keyOf(sid,name,p)),s=await getDoc(ref);
+      if(s.exists())try{localStorage.setItem("mid:"+sid,ref.id)}catch{}
+      const vl=`<p style="margin-top:14px"><a href="?s=${sid}&v=1">투표 페이지로 이동 →</a></p>`;
       if(!s.exists())r.innerHTML=`<div class="msg no">명단에서 확인되지 않습니다. 이름과 번호를 다시 확인하거나 접수처에 문의해 주세요.</div>`;
-      else if(s.data().checkedIn)r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님은 이미 참석 확인되었습니다.</div>`;
+      else if(s.data().checkedIn)r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님은 이미 참석 확인되었습니다.</div>${vl}`;
       else{await updateDoc(ref,{checkedIn:true,checkedInAt:serverTimestamp()});
-        r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님, 참석 확인되었습니다.</div>`}
+        r.innerHTML=`<div class="msg ok">${esc(s.data().name)}님, 참석 확인되었습니다.</div>${vl}`}
     }catch(e){r.innerHTML=`<div class="msg no">처리하지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`}
     $("#go").disabled=false;
   };
+}
+
+
+/* ───────── 투표 화면 (QR로 접속) ───────── */
+async function voter(){
+  let title="총회";
+  try{const t=await getDoc(doc(db,"sessions",sid));if(!t.exists())throw 0;title=t.data().title}
+  catch{root.innerHTML=`<div class="card"><h1>유효하지 않은 QR입니다</h1></div>`;return}
+  const verify=async id=>{try{const m=await getDoc(doc(db,"sessions",sid,"members",id));return m.exists()?m.data():null}catch{return null}};
+  let mid=null;try{mid=localStorage.getItem("mid:"+sid)}catch{}
+  const me=mid?await verify(mid):null;
+  if(me&&me.checkedIn)return start(mid,me);
+  root.innerHTML=`<div class="card"><h1>${esc(title)}</h1><p class="mute">투표 전, 본인 확인을 해 주세요. (참석 확인을 마친 분만 투표할 수 있습니다)</p>
+    <label for="n">이름</label><input id="n" autocomplete="name"><label for="p">전화번호 뒤 4자리</label><input id="p" inputmode="numeric" maxlength="4">
+    <button class="p big" id="go">확인</button><div id="r"></div></div>`;
+  $("#p").oninput=e=>e.target.value=e.target.value.replace(/\D/g,"");
+  $("#go").onclick=async()=>{
+    const name=$("#n").value.trim(),p=$("#p").value,r=$("#r");
+    if(!name||p.length!==4){r.innerHTML=`<div class="msg no">이름과 전화번호 4자리를 입력해 주세요.</div>`;return}
+    const id=await keyOf(sid,name,p),m=await verify(id);
+    if(!m)r.innerHTML=`<div class="msg no">명단에서 확인되지 않습니다.</div>`;
+    else if(!m.checkedIn)r.innerHTML=`<div class="msg no">먼저 참석 확인이 필요합니다.</div><p style="margin-top:12px"><a href="?s=${sid}">참석 확인하러 가기 →</a></p>`;
+    else{try{localStorage.setItem("mid:"+sid,id)}catch{}start(id,m)}
+  };
+  function start(id,m){
+    let curId=null,ag=null,voted=null,pending=null,uA,uV;
+    const mt=a=>`의결 요건: 출석 인원의 ${a.mode==="two"?"3분의 2 이상":"과반수"} 찬성`;
+    function paint(){
+      let h=`<div class="card"><h1>${esc(title)}</h1><p class="mute">${esc(m.name)}님</p>`;
+      if(!ag||ag.status==="ready")h+=`<div class="msg" style="background:var(--bg)">진행 중인 투표가 없습니다.<br><span class="mute">투표가 시작되면 이 화면에 자동으로 나타납니다.</span></div>`;
+      else{
+        h+=`<h2 style="margin-top:16px">${esc(ag.title)}</h2><p class="mute">${mt(ag)}</p>`;
+        if(voted)h+=`<div class="msg ok">투표가 완료되었습니다. (${voted==="y"?"찬성":"반대"})</div>`;
+        else if(ag.status==="closed")h+=`<div class="msg no">투표가 종료되었습니다.</div>`;
+        else if(pending)h+=`<div class="msg" style="background:var(--bg)">‘${pending==="y"?"찬성":"반대"}’으로 투표합니다. 제출 후에는 바꿀 수 없습니다.</div>
+          <button class="vbtn ${pending}" id="ok">${pending==="y"?"찬성":"반대"} 제출</button><button class="vbtn g" id="cx">다시 선택</button>`;
+        else h+=`<button class="vbtn y" data-c="y">찬성</button><button class="vbtn n" data-c="n">반대</button>`;
+      }
+      root.innerHTML=h+`<div id="er"></div></div>`;
+      root.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{pending=b.dataset.c;paint()});
+      $("#cx")&&($("#cx").onclick=()=>{pending=null;paint()});
+      $("#ok")&&($("#ok").onclick=async()=>{$("#ok").disabled=true;
+        try{await setDoc(doc(db,"sessions",sid,"agendas",curId,"votes",id),{c:pending});pending=null}
+        catch{$("#er").innerHTML=`<div class="msg no">제출하지 못했습니다. 이미 투표했거나 투표가 종료되었을 수 있습니다.</div>`;$("#ok").disabled=false}});
+    }
+    function watch(aid){
+      uA?.();uV?.();ag=null;voted=null;pending=null;curId=aid;
+      if(!aid){paint();return}
+      uA=onSnapshot(doc(db,"sessions",sid,"agendas",aid),x=>{ag=x.exists()?{id:aid,...x.data()}:null;paint()},()=>{});
+      uV=onSnapshot(doc(db,"sessions",sid,"agendas",aid,"votes",id),x=>{voted=x.exists()?x.data().c:null;paint()},()=>{});
+    }
+    paint();
+    onSnapshot(doc(db,"sessions",sid),x=>{const a=x.data()?.curAgenda||null;if(a!==curId)watch(a)});
+  }
 }
 
 /* ───────── 관리자 화면 ───────── */
@@ -163,7 +247,7 @@ function login(){
     $("#r").innerHTML=`<div class="msg no">${m[c]||"로그인하지 못했습니다."}<br><small>오류 코드: ${esc(c)}</small></div>`});
 }
 
-let campusF="",campusKey="",shownCur=null,unsubD,unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
+let agendas=[],vcur=null,vt={y:0,n:0},vqrUrl="",unsubA,unsubV,campusF="",campusKey="",shownCur=null,unsubD,unsubS,unsubM,sessions=[],cur=null,members=[],filter="all",q="";
 function admin(){
   root.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:12px">
     <h1 style="margin:0">총회 참석자 관리</h1><button id="out">로그아웃</button></div>
@@ -188,7 +272,7 @@ function admin(){
 }
 
 function pick(id){
-  cur=id||null;unsubM?.();unsubD?.();members=[];vmode="maj";votes=0;
+  cur=id||null;unsubM?.();unsubD?.();members=[];vmode="maj";votes=0;unsubA?.();unsubV?.();agendas=[];vcur=null;vt={y:0,n:0};
   if(!cur){$("#main").innerHTML=`<div class="card"><p>'새 총회 만들기'로 첫 총회를 만들어 주세요.</p></div>`;return}
   $("#main").innerHTML=`<div class="card">
     <div class="row" style="margin-bottom:6px"><button class="p" id="db">조합원 DB에서 불러오기</button><button id="up">엑셀로 올리기</button>
@@ -201,12 +285,16 @@ function pick(id){
       <button type="button" class="mc" data-m="maj"><b>과반수 찬성</b><span>출석한 조합원의 절반을 <u>넘게</u> 찬성하면 가결됩니다. 정확히 절반은 부결입니다. (일반 안건)</span><em id="me1"></em></button>
       <button type="button" class="mc" data-m="two"><b>3분의 2 찬성</b><span>출석한 조합원의 3분의 2 <u>이상</u> 찬성하면 가결됩니다. 정확히 3분의 2는 가결입니다. (중요 안건)</span><em id="me2"></em></button></div>
       <p class="mute" style="margin:8px 0 0">※ 먼저 총회가 성립(재적인원 과반수 출석)되어야 의결할 수 있습니다. 안건별로 어느 요건을 적용할지는 규약을 확인해 주세요.</p></div>
+    <div id="agw" style="margin-top:18px"><h2>안건 · 투표</h2>
+      <div class="row"><input id="at" class="grow" placeholder="안건 이름 (예: 제1호 안건 – 2027년 예산안)"><select id="am" style="width:auto" aria-label="의결 방식"><option value="maj">과반수 찬성</option><option value="two">3분의 2 찬성</option></select><button class="p" id="aa">안건 추가</button></div>
+      <div class="scroll"><table class="ag"><thead><tr><th>안건</th><th>방식</th><th>상태</th><th>투표 현황</th><th></th></tr></thead><tbody id="ag"></tbody></table></div>
+      <p class="mute" style="margin:6px 0 0">투표를 시작하면 그 시점의 출석 인원이 의결 기준이 됩니다. 참석 확인을 마친 조합원만 1인 1표로 투표할 수 있습니다.</p></div>
     <div class="row" style="margin:16px 0 8px"><input id="s" class="grow" placeholder="이름·소속·캠퍼스 검색"><select id="cf" style="width:auto" aria-label="캠퍼스 선택"><option value="">전체 캠퍼스</option></select>
       <span class="tabs row" id="tabs"><button data-f="all" class="on">전체</button><button data-f="in">참석</button><button data-f="out">미참석</button></span></div>
     <div class="scroll"><table><thead><tr><th>이름</th><th>캠퍼스</th><th>소속</th><th>상태</th><th>시각</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
   $("#up").onclick=()=>$("#f").click();$("#db").onclick=syncDb;
   $("#f").onchange=e=>upload(e.target.files[0]);
-  $("#pj").onclick=openProj;$("#mode").onclick=e=>{const b=e.target.closest("[data-m]");if(b)setMode(b.dataset.m)};$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
+  $("#pj").onclick=openProj;$("#aa").onclick=addAgenda;$("#ag").onclick=agAct;$("#mode").onclick=e=>{const b=e.target.closest("[data-m]");if(b)setMode(b.dataset.m)};$("#qrb").onclick=showQR;$("#ex").onclick=exportXlsx;
   $("#s").oninput=e=>{q=e.target.value.trim();draw()};campusKey="";$("#cf").onchange=e=>{campusF=e.target.value;draw()};
   $("#tabs").onclick=e=>{const f=e.target.dataset.f;if(!f)return;filter=f;
     document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.f===f));draw()};
@@ -216,7 +304,10 @@ function pick(id){
   });
   // 의결 방식·찬성 수를 총회 문서에 저장 → 관리자 창/프로젝터 창이 여러 개여도 실시간 동기화
   unsubD=onSnapshot(doc(db,"sessions",cur),snap=>{const d=snap.data()||{};
-    vmode=d.vmode==="two"?"two":"maj";votes=Number(d.votes)||0;drawMode();drawProj()});
+    vmode=d.vmode==="two"?"two":"maj";votes=Number(d.votes)||0;drawMode();drawProj();
+    const nv=d.curAgenda||null;if(nv!==vcur){vcur=nv;watchVotes()}});
+  unsubA=onSnapshot(query(collection(db,"sessions",cur,"agendas"),orderBy("createdAt")),snap=>{
+    agendas=snap.docs.map(d=>({id:d.id,...d.data()}));drawAgendas();drawVP()});
 }
 
 /* ───────── 프로젝터 화면: 총회 성립 요건 = 재적인원 과반수 출석 / 의결 = 출석 인원 과반수 찬성 ───────── */
@@ -247,8 +338,8 @@ function tick(){
 function openProj(){$("#proj").classList.add("on");lastA=-1;wasOk=false;drawProj();tick();clearInterval(clk);clk=setInterval(tick,1000);document.documentElement.requestFullscreen?.().catch(()=>{})}
 function closeProj(){$("#proj").classList.remove("on");if(document.fullscreenElement)document.exitFullscreen()}
 $("#pc").onclick=closeProj;
-document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement)$("#proj").classList.remove("on")});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeProj()});
+document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement){$("#proj").classList.remove("on");$("#vp").classList.remove("on")}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeProj();closeVP()}});
 function drawProj(){
   const p=$("#proj");if(!p.classList.contains("on"))return;
   const tot=members.length,a=members.filter(m=>m.checkedIn).length,need=Math.floor(tot/2)+1,ok=tot>0&&a>=need;
@@ -269,6 +360,77 @@ function drawProj(){
     <div class="pvd">${M.rule(a)} ${nd}명 이상 찬성해야 가결됩니다.</div>`+(votes>0?`<div class="pvr ${res==="가결"?"yes":"no"}">찬성 ${votes}명 → ${res}</div>`:"");
   $("#vc").textContent=votes;
   document.querySelectorAll("#pctl [data-m]").forEach(x=>x.classList.toggle("on",x.dataset.m===vmode));
+}
+
+
+/* ───────── 안건 · 투표 (관리자) ───────── */
+function watchVotes(){
+  unsubV?.();vt={y:0,n:0};unsubV=null;
+  if(vcur)unsubV=onSnapshot(collection(db,"sessions",cur,"agendas",vcur,"votes"),snap=>{
+    let y=0,n=0;snap.forEach(d=>d.data().c==="y"?y++:n++);vt={y,n};drawAgendas();drawVP()});
+  drawAgendas();drawVP();
+}
+// 가결·부결 판정: 가결 = 찬성이 요건 이상, 부결 확정 = 남은 인원이 전부 찬성해도 요건에 못 미칠 때
+function judge(ag,y,n){
+  const b=ag.base||0,M=MODES[ag.mode]||MODES.maj,need=M.need(b),against=b-need+1,kind=ag.mode==="two"?"3분의 2 이상":"과반수";
+  let st="go",msg="투표 진행 중",detail=`가결까지 찬성 ${Math.max(0,need-y)}표 더 필요 · 반대가 ${Math.max(0,against-n)}표 더 나오면 부결이 확정됩니다.`;
+  if(ag.status==="ready"){msg="투표 대기";detail="투표가 시작되면 QR로 투표할 수 있습니다."}
+  else if(b>0&&y>=need){st="pass";msg="가결";detail=`찬성 ${y}표로 의결 요건(찬성 ${need}표 이상)을 달성했습니다. 출석 ${b}명의 ${kind}이 찬성하여 가결이 확정되었습니다.`}
+  else if(b>0&&n>=against){st="fail";msg="부결";detail=`반대 ${n}표로 부결이 확정되었습니다. 남은 인원이 모두 찬성해도 찬성은 최대 ${b-n}표로, 가결 요건(${need}표 이상)에 미달합니다.`}
+  else if(ag.status==="closed"){st="fail";msg="부결";detail=`투표가 종료되었고 찬성 ${y}표로 가결 요건(${need}표 이상)에 미달하여 부결되었습니다.`}
+  return{b,need,against,st,msg,detail,kind};
+}
+async function addAgenda(){
+  const t=$("#at").value.trim();if(!t)return alert("안건 이름을 입력해 주세요.");
+  await addDoc(collection(db,"sessions",cur,"agendas"),{title:t,mode:$("#am").value,status:"ready",base:0,createdAt:serverTimestamp()});
+  $("#at").value="";
+}
+function drawAgendas(){
+  const el=$("#ag");if(!el)return;
+  el.innerHTML=agendas.map(a=>{
+    const live=a.id===vcur,j=judge(a,live?vt.y:0,live?vt.n:0),stt={ready:"대기",open:"진행 중",closed:"종료"}[a.status]||"";
+    const btn=a.status==="ready"?`<button class="p" data-a="start" data-id="${a.id}">투표 시작</button><button data-a="del" data-id="${a.id}">삭제</button>`
+      :a.status==="open"?`<button class="p" data-a="stop" data-id="${a.id}">투표 종료</button><button data-a="show" data-id="${a.id}">투표 화면</button>`
+      :`<button data-a="show" data-id="${a.id}">결과 화면</button><button data-a="reopen" data-id="${a.id}">다시 열기</button>`;
+    return `<tr><td>${esc(a.title)}</td><td>${a.mode==="two"?"3분의 2":"과반수"}</td><td>${stt}</td>
+      <td>${live&&a.status!=="ready"?`<span class="y">찬성 ${vt.y}</span> · <span class="n">반대 ${vt.n}</span><br><span class="mute">${j.msg==="투표 진행 중"?"기준 "+j.b+"명 · 가결 "+j.need+"표":j.msg}</span>`:"-"}</td><td>${btn}</td></tr>`}).join("")
+    ||`<tr><td colspan="5" class="mute">안건을 추가해 주세요.</td></tr>`;
+}
+async function agAct(e){
+  const b=e.target.closest("button[data-a]");if(!b)return;
+  const id=b.dataset.id,a=agendas.find(x=>x.id===id),ref=doc(db,"sessions",cur,"agendas",id),sref=doc(db,"sessions",cur);
+  const act=b.dataset.a;
+  if(act==="del"){if(confirm("이 안건을 삭제할까요?"))await deleteDoc(ref);return}
+  if(act==="stop"){await updateDoc(ref,{status:"closed"});return}
+  if(act==="show"){await updateDoc(sref,{curAgenda:id});openVP();return}
+  if(act==="start"||act==="reopen"){
+    const n=attN();if(act==="start"&&!n&&!confirm("현재 출석 확인된 인원이 0명입니다. 그래도 시작할까요?"))return;
+    for(const o of agendas)if(o.id!==id&&o.status==="open")await updateDoc(doc(db,"sessions",cur,"agendas",o.id),{status:"closed"});
+    await updateDoc(ref,act==="start"?{status:"open",base:n}:{status:"open"});
+    await updateDoc(sref,{curAgenda:id});openVP();
+  }
+}
+
+/* 투표 현황 프로젝터 화면 */
+function openVP(){$("#vp").classList.add("on");vqrUrl="";drawVP();document.documentElement.requestFullscreen?.().catch(()=>{})}
+function closeVP(){$("#vp").classList.remove("on");if(document.fullscreenElement)document.exitFullscreen()}
+$("#vc2").onclick=closeVP;
+function drawVP(){
+  const o=$("#vp");if(!o.classList.contains("on"))return;
+  const url=`${location.origin}${location.pathname}?s=${cur}&v=1`;
+  if(vqrUrl!==url){vqrUrl=url;const px=Math.round(Math.min(innerWidth*.26,innerHeight*.48));$("#vqr").innerHTML="";
+    new QRCode($("#vqr"),{text:url,width:px,height:px,correctLevel:QRCode.CorrectLevel.M})}
+  const ag=agendas.find(a=>a.id===vcur);
+  o.classList.remove("pass","fail");
+  if(!ag){$("#vt").textContent=sessions.find(x=>x.id===cur)?.title||"";$("#vm").textContent="";$("#vs").textContent="투표 대기";$("#vd").textContent="진행 중인 안건이 없습니다.";return}
+  const j=judge(ag,vt.y,vt.n),b=j.b||1;
+  $("#vt").textContent=ag.title;$("#vm").textContent=`의결 요건: 출석 인원 ${j.b}명의 ${j.kind} 찬성 (찬성 ${j.need}표 이상)`;
+  $("#vy").textContent=vt.y;$("#vn").textContent=vt.n;
+  $("#vyb").style.width=Math.min(100,vt.y/b*100)+"%";$("#vnb").style.width=Math.min(100,vt.n/b*100)+"%";
+  $("#vym").style.left=(j.need/b*100)+"%";$("#vnm").style.left=(j.against/b*100)+"%";
+  $("#vyn").textContent=`가결 ${j.need}표`;$("#vnn").textContent=`부결 확정 ${j.against}표`;
+  $("#vpt").textContent=`투표 ${vt.y+vt.n}명 / 의결 기준 ${j.b}명`;
+  $("#vs").textContent=j.msg;$("#vd").textContent=j.detail;if(j.st!=="go")o.classList.add(j.st);
 }
 
 const fmt=t=>t?.toDate?t.toDate().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
@@ -351,7 +513,7 @@ function exportXlsx(){
 }
 
 /* ───────── 시작 ───────── */
-if(sid)attendee();
+if(sid)(new URLSearchParams(location.search).get("v")?voter():attendee());
 else onAuthStateChanged(auth,u=>{if(u)admin();else{unsubS?.();unsubM?.();login()}});
 </script>
 </body>

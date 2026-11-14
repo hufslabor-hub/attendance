@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ★ 관리자 이메일을 본인 계정으로 바꾸세요 (Authentication에서 만든 계정)
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['admin@example.com'];
+    }
+
+    match /sessions/{sid} {
+      allow get: if true;                       // QR 접속 시 총회 이름 표시
+      allow list, create, update, delete: if isAdmin();
+
+      match /members/{mid} {
+        allow get: if true;                     // 이름+번호 해시를 알아야만 조회 가능
+        allow list, create, delete: if isAdmin(); // 명단 전체 조회는 관리자만
+
+        allow update: if isAdmin() || (
+          resource.data.checkedIn == false
+          && request.resource.data.checkedIn == true
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['checkedIn', 'checkedInAt'])
+        );
+      }
+
+      // 안건(투표)
+      match /agendas/{aid} {
+        allow get: if true;                        // 투표 화면에서 안건 제목·상태 표시
+        allow list, create, update, delete: if isAdmin();
+
+        match /votes/{mid} {
+          allow get: if true;                      // 본인 투표 여부 확인(문서 ID를 아는 본인만)
+          allow list, update, delete: if isAdmin(); // 집계는 관리자만
+          // 참석 확인된 조합원이, 진행 중인 안건에, 1인 1회(문서 ID=본인 키)만 생성 가능
+          allow create: if request.resource.data.keys().hasOnly(['c'])
+            && request.resource.data.c in ['y', 'n']
+            && get(/databases/$(database)/documents/sessions/$(sid)/agendas/$(aid)).data.status == 'open'
+            && get(/databases/$(database)/documents/sessions/$(sid)/members/$(mid)).data.checkedIn == true;
+        }
+      }
+    }
+  }
+}
