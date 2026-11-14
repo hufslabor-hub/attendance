@@ -149,3 +149,8 @@ function mailHtml_(name, title, code, link, note) {
     (link ? '<p><a href="' + esc(link) + '">참석 확인 페이지 열기</a></p>' : '') +
     '<p style="color:#777;font-size:13px">이 번호는 본인 확인용이므로 다른 사람에게 알려주지 마세요.</p>';
 }
+
+// 처음 한 번만: 편집기에서 이 함수를 직접 실행해 '이메일 보내기' 권한을 승인하세요. (승인 후 반드시 새 버전으로 재배포)
+function authMail() {
+  Logger.log('오늘 남은 메일 발송 가능 수: ' + MailApp.getRemainingDailyQuota());
+}

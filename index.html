@@ -138,7 +138,7 @@ const firebaseConfig={
 };
 // 조합원 DB(Apps Script 웹앱) 주소: /exec 까지만 입력
 const MEMBER_API="https://script.google.com/macros/s/AKfycbznNPK2Yb13VMhHg9o7NIek1XSrg32FQXqhI-OLyUi_KUaKxa5j3ASV1VfMpN2Ttz0/exec";
-// 참석 명단에서 제외할 그룹(상태) 표기  필요하면 수정
+// 참석 명단에서 제외할 그룹(상태) 표기 — 필요하면 수정
 const EXCLUDE_STATUS=["퇴직","자격정지"];
 /* ▲▲ */
 
@@ -457,7 +457,7 @@ async function testMail(){
     if(r.error)throw new Error(r.error==="invalid-email"?"이메일 주소 형식이 올바르지 않습니다":r.error==="member-not-found"?"해당 이름의 대상 조합원을 찾지 못했습니다":r.error);
     localStorage.setItem("mtk",t);localStorage.setItem("testmail",to);
     alert(`${to} 로 테스트 메일을 보냈습니다.\n`+(r.sample?"샘플 번호(1234)가 들어 있습니다.":`${r.name}님의 실제 인증번호가 들어 있습니다. 이 번호로 참석 확인 화면을 시험해 볼 수 있습니다.`)+`\n(오늘 남은 발송 가능 수: ${r.quota})`);
-  }catch(e){alert("테스트 메일을 보내지 못했습니다. ("+(e.message||"연결 실패")+")")}
+  }catch(e){alert("테스트 메일을 보내지 못했습니다. ("+(e.message||"연결 실패")+")"+(e.message==="Failed to fetch"?"\n\n웹 앱이 응답하지 않았습니다. Apps Script에서 메일 발송 권한 승인(authMail 실행)과 새 버전 재배포가 필요할 수 있습니다.":""))}
 }
 
 /* ───────── 개인별 인증번호 메일 발송 ───────── */
@@ -484,7 +484,7 @@ async function sendCodes(only){
       +(failed.length?`\n발송 실패 ${failed.length}명: ${failed.slice(0,10).join(", ")}`:"")
       +(stopped?"\n⚠ 일일 메일 발송 한도에 도달해 중단되었습니다. 내일 다시 시도해 주세요.":"")
       +(quota!=null?`\n(오늘 남은 발송 가능 수: ${quota})`:""));
-  }catch(e){alert("발송하지 못했습니다. ("+(e.message||"연결 실패")+")\n웹앱 배포 상태와 키, CODE_SECRET 설정을 확인해 주세요.")}
+  }catch(e){alert("발송하지 못했습니다. ("+(e.message||"연결 실패")+")\n웹앱 배포 상태와 키, CODE_SECRET 설정을 확인해 주세요."+(e.message==="Failed to fetch"?"\n\n웹 앱이 응답하지 않았습니다. Apps Script에서 메일 발송 권한 승인(authMail 실행)과 새 버전 재배포가 필요할 수 있습니다.":""))}
   if(bt){bt.disabled=false;bt.textContent=label}
 }
 
