@@ -27,7 +27,8 @@ function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const send = body.action === 'sendcodes';
-    const attend = body.action === 'attend' || send;
+    const emails = body.action === 'emails';
+    const attend = body.action === 'attend' || send || emails;
     const key = PropertiesService.getScriptProperties().getProperty(attend ? 'ATTEND_API_KEY' : 'SITE_API_KEY');
     if (!key || body.key !== key) return apiJson_({ error: 'unauthorized' });
 
@@ -58,11 +59,12 @@ function doPost(e) {
         const email = (wi >= 0 && String(rows[r][wi]).trim()) || (ei >= 0 && String(rows[r][ei]).trim()) || '';
         m.hasEmail = !!email;
         if (body.sid) m.code = code_(body.sid, name, m.phone4);
-        if (send) m.email = email;
+        if (send || emails) m.email = email;
       }
       members.push(m);
     }
     if (send) return sendCodes_(body, members);
+    if (emails) return emailsFor_(body, members);
     return apiJson_({ members: members });
   } catch (err) {
     return apiJson_({ error: 'server-error' });
@@ -153,4 +155,20 @@ function mailHtml_(name, title, code, link, note) {
 // 처음 한 번만: 편집기에서 이 함수를 직접 실행해 '이메일 보내기' 권한을 승인하세요. (승인 후 반드시 새 버전으로 재배포)
 function authMail() {
   Logger.log('오늘 남은 메일 발송 가능 수: ' + MailApp.getRemainingDailyQuota());
+}
+
+// 참석 확인된 사람(이름+소속)의 이메일 목록 — Belenios 투표자 명단용. 이름·소속이 유일하게 일치하는 경우만 포함.
+function emailsFor_(body, members) {
+  const norm = function (s) { return String(s).replace(/\s+/g, ''); };
+  const idx = {};
+  members.forEach(function (m) { const k = norm(m.name) + '|' + String(m.dept || '').trim(); (idx[k] = idx[k] || []).push(m); });
+  const emails = [], missing = [], seen = {};
+  (body.people || []).slice(0, 5000).forEach(function (p) {
+    const c = idx[norm(p.name) + '|' + String(p.dept || '').trim()] || [];
+    if (c.length === 1 && c[0].email) {
+      if (seen[c[0].email]) missing.push(p.name + '(이메일 중복)');
+      else { seen[c[0].email] = 1; emails.push(c[0].email); }
+    } else missing.push(p.name + (c.length > 1 ? '(동명이인)' : c.length ? '(이메일 없음)' : '(명단 불일치)'));
+  });
+  return apiJson_({ ok: true, emails: emails, missing: missing });
 }

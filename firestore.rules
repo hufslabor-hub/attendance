@@ -14,7 +14,7 @@ service cloud.firestore {
     match /sessions/{sid} {
       allow get: if true;                                   // QR 접속 시 총회 이름 표시
       allow list, create: if isAdmin();
-      allow update: if isAdmin() && changed().hasOnly(['curAgenda', 'vmode', 'votes']);  // needCode 등은 생성 후 변경 불가
+      allow update: if isAdmin() && changed().hasOnly(['curAgenda', 'vmode', 'votes', 'beleniosUrl']);  // needCode 등은 생성 후 변경 불가
       allow delete: if false;
 
       match /members/{mid} {
@@ -57,6 +57,7 @@ service cloud.firestore {
             && request.resource.data.c in ['y', 'n']
             && get(/databases/$(database)/documents/sessions/$(sid)).data.get('needCode', false) == true
             && get(/databases/$(database)/documents/sessions/$(sid)/agendas/$(aid)).data.status == 'open'
+            && get(/databases/$(database)/documents/sessions/$(sid)/agendas/$(aid)).data.get('kind', 'app') != 'secret'   // 비밀투표 안건은 앱에서 투표 불가(Belenios 사용)
             && get(/databases/$(database)/documents/sessions/$(sid)/members/$(mid)).data.checkedIn == true;
         }
       }
