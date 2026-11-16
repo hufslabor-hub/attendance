@@ -7,34 +7,55 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email in ['admin@example.com'];
     }
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
 
     match /sessions/{sid} {
-      allow get: if true;                       // QR 접속 시 총회 이름 표시
-      allow list, create, update, delete: if isAdmin();
+      allow get: if true;                                   // QR 접속 시 총회 이름 표시
+      allow list, create: if isAdmin();
+      allow update: if isAdmin() && changed().hasOnly(['curAgenda', 'vmode', 'votes']);  // needCode 등은 생성 후 변경 불가
+      allow delete: if false;
 
       match /members/{mid} {
-        allow get: if true;                     // 이름+번호 해시를 알아야만 조회 가능
-        allow list, create, delete: if isAdmin(); // 명단 전체 조회는 관리자만
-
-        allow update: if isAdmin() || (
+        allow get: if true;                                 // 이름+번호(+인증번호) 해시를 알아야만 조회 가능
+        allow list: if isAdmin();                           // 명단 전체 조회는 관리자만
+        // 투표(안건) 시작 이후에는 명단 추가 불가 → 투표 중 가짜 조합원 추가 방지
+        allow create: if isAdmin()
+          && request.resource.data.checkedIn == false
+          && get(/databases/$(database)/documents/sessions/$(sid)).data.get('curAgenda', null) == null;
+        allow delete: if false;
+        allow update: if (isAdmin() && changed().hasOnly(['checkedIn', 'checkedInAt', 'campus'])) || (
           resource.data.checkedIn == false
           && request.resource.data.checkedIn == true
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['checkedIn', 'checkedInAt'])
+          && changed().hasOnly(['checkedIn', 'checkedInAt'])
         );
       }
 
-      // 안건(투표)
+      // 안건(투표): 종료된 안건은 관리자 계정으로도 수정 불가
       match /agendas/{aid} {
-        allow get: if true;                        // 투표 화면에서 안건 제목·상태 표시
-        allow list, create, update, delete: if isAdmin();
+        allow get: if true;
+        allow list: if isAdmin();
+        allow create: if isAdmin() && request.resource.data.status == 'ready';
+        allow update: if isAdmin() && (
+          // 대기 → 대기/진행 (시작 시 기준 인원 base 기록)
+          (resource.data.status == 'ready' && request.resource.data.status in ['ready', 'open'])
+          // 진행 → 종료 (상태만 변경)
+          || (resource.data.status == 'open' && request.resource.data.status == 'closed' && changed().hasOnly(['status']))
+          // 종료 후 집계·해시를 '한 번만' 기록
+          || (resource.data.status == 'closed' && request.resource.data.status == 'closed' && !('digest' in resource.data)
+              && changed().hasOnly(['yes', 'no', 'digest', 'closedAt']))
+        );
+        allow delete: if isAdmin() && resource.data.status == 'ready';
 
         match /votes/{mid} {
-          allow get: if true;                      // 본인 투표 여부 확인(문서 ID를 아는 본인만)
-          allow list, update, delete: if isAdmin(); // 집계는 관리자만
-          // 참석 확인된 조합원이, 진행 중인 안건에, 1인 1회(문서 ID=본인 키)만 생성 가능
+          allow get: if true;                               // 본인 투표 확인(문서 ID를 아는 본인만)
+          allow list: if isAdmin();                         // 집계는 관리자만
+          allow update, delete: if false;                   // 한번 생성된 표는 누구도(관리자 계정 포함) 수정·삭제 불가
+          // 인증번호 사용 총회에서, 참석 확인된 조합원이, 진행 중인 안건에, 1인 1회만 생성 가능
           allow create: if request.resource.data.keys().hasOnly(['c'])
             && request.resource.data.c in ['y', 'n']
+            && get(/databases/$(database)/documents/sessions/$(sid)).data.get('needCode', false) == true
             && get(/databases/$(database)/documents/sessions/$(sid)/agendas/$(aid)).data.status == 'open'
             && get(/databases/$(database)/documents/sessions/$(sid)/members/$(mid)).data.checkedIn == true;
         }
